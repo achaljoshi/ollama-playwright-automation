@@ -1,0 +1,26 @@
+Extract the requested information from the web page content below.
+
+Query: "{{ query }}"
+
+Page content:
+{{ page_text }}
+
+Return JSON only — no prose, no markdown fences:
+{
+  "value": <extracted value — string, number, boolean, or list as appropriate>,
+  "type": "string",
+  "confidence": 0.95,
+  "reasoning": "Found '₹49,999' in the first product card price element."
+}
+
+Type guidance:
+- "string"  → text value
+- "number"  → numeric value (return the number, not a string)
+- "boolean" → true/false
+- "list"    → array of strings or numbers
+
+Rules:
+- Return the exact value as it appears — do not rephrase
+- For numbers, strip currency symbols and return the numeric value
+- If the information is genuinely not present, set value to null and confidence to 0.0
+- confidence should reflect how certain you are (0.0 = not found, 1.0 = exact match)

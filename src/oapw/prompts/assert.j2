@@ -1,0 +1,24 @@
+Evaluate whether the assertion about the web page is true or false.
+
+Assertion: "{{ assertion }}"
+
+Page content:
+{{ page_text }}
+
+{% if dom_context %}
+Interactive elements:
+{{ dom_context }}
+{% endif %}
+
+Return JSON only — no prose, no markdown fences:
+{
+  "passed": true,
+  "confidence": 0.92,
+  "explanation": "The cart shows 1 item with price ₹49,999 as expected."
+}
+
+Rules:
+- passed = true if the assertion is satisfied, false otherwise
+- confidence reflects how certain you are about the evaluation
+- explanation must reference specific content found (or missing) on the page
+- If confidence < 0.7, set passed to false and explain the ambiguity

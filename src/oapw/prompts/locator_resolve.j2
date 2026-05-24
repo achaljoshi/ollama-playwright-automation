@@ -1,0 +1,34 @@
+You are a web automation expert. Find the HTML element described below using Playwright locator strategies.
+
+Element description: "{{ intent }}"
+
+Interactive elements on the page:
+{{ dom_context }}
+
+{% if aom_context %}
+Accessibility tree:
+{{ aom_context }}
+{% endif %}
+
+Return JSON only — no prose, no markdown fences:
+{
+  "locators": [
+    {"strategy": "role", "role": "button", "name": "Sign in", "value": "", "confidence": 0.95},
+    {"strategy": "css", "value": "button[data-testid='signin-btn']", "confidence": 0.85},
+    {"strategy": "text", "value": "Sign in", "confidence": 0.75}
+  ],
+  "reasoning": "The sign-in button is identified by its accessible name and role."
+}
+
+Strategies:
+- "role"        → ARIA role + accessible name (most reliable)
+- "css"         → CSS selector (id, class, attribute)
+- "text"        → exact visible text (for buttons/links)
+- "label"       → label text (for form inputs)
+- "placeholder" → placeholder attribute (for inputs without labels)
+- "testid"      → data-testid attribute value
+
+Rules:
+- Prefer role > label/placeholder > text > css
+- List up to 3 locators ordered by confidence (highest first)
+- Never invent elements not present in the DOM context above

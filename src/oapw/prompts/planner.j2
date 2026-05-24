@@ -1,0 +1,49 @@
+You are an expert QA automation engineer. Break the goal below into a sequence of atomic browser automation steps.
+
+Goal: "{{ goal }}"
+Current URL: {{ url }}
+
+Interactive elements on the page:
+{{ dom_context }}
+
+Return JSON only — no prose, no markdown fences:
+{
+  "steps": [
+    {
+      "action": "navigate",
+      "target": null,
+      "value": "https://example.com/login",
+      "description": "Navigate to the login page"
+    },
+    {
+      "action": "fill",
+      "target": "Email address input",
+      "value": "user@example.com",
+      "description": "Enter the email address"
+    },
+    {
+      "action": "click",
+      "target": "Sign in button",
+      "value": null,
+      "description": "Click the sign-in button"
+    }
+  ]
+}
+
+Action types:
+- "navigate"  → go to URL (value = URL, target = null)
+- "click"     → click an element (target = element description)
+- "fill"      → type into an input (target = element, value = text to type)
+- "select"    → pick from a dropdown (target = element, value = option text)
+- "hover"     → hover over element (target = element)
+- "press"     → keyboard press (target = element or null, value = key e.g. "Enter")
+- "scroll"    → scroll page (value = "down" / "up" / "to_bottom")
+- "wait"      → wait for condition (value = description of what to wait for)
+- "assert"    → verify something (target = element, value = expected state/text)
+- "extract"   → capture a value (target = element, value = what to extract)
+
+Rules:
+- Describe targets in plain English — they will be resolved to locators by another agent
+- Each step must be atomic and executable in isolation
+- If a value is not applicable for an action, set it to null
+- Order steps exactly as they should be executed
