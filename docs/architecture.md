@@ -87,8 +87,9 @@ oapw is a **local-first** AI automation framework. All AI inference runs via Oll
 | **Agent orchestration** | `agents/runner.py` | AgentRunner, LoopGuard, HookRegistry — plan→execute→guard pipeline |
 | **QA Agent** | `qa_agent/` | GoalParser, TestSelector, JudgmentEngine, Investigator, QaMemory, SmartExecutor, QaOrchestrator |
 | **Verification** | `verification/` | AccessibilityChecker (axe-core), PerformanceCapture (Web Vitals), VisualChecker (pixel-diff) |
+| **pytest plugin** | `plugin/__init__.py` | 10 fixtures: oapw_page, oapw_hybrid, oapw_factory, oapw_accessibility, oapw_performance, oapw_visual, oapw_qa_agent, … |
 | **Config** | `core/config.py` | pydantic-settings, OAPW_* env prefix |
-| **CLI** | `cli/main.py` | typer + rich CLI |
+| **CLI** | `cli/main.py` | typer + rich CLI (doctor, init, cache, kb, auth, generate, run, qa) |
 
 ---
 
@@ -371,6 +372,88 @@ parse_generic(source, ...):
 The singleton is accessed via `get_config()` and can be reset with `reset_config()` (important in tests to pick up per-test `monkeypatch.setenv` changes).
 
 See **[docs/configuration.md](configuration.md)** for all settings.
+
+---
+
+## Phase 10: Productionization
+
+### pytest Plugin Packaging
+
+oapw registers its fixtures as a pytest plugin via the `pytest11` entry point in `pyproject.toml`:
+
+```toml
+[tool.poetry.plugins."pytest11"]
+oapw = "oapw.plugin"
+```
+
+This means any project that installs oapw (via `pip install oapw` or `poetry add oapw`) gets all ten fixtures automatically — no `conftest.py` imports required.
+
+The four Phase 9/10 fixtures are intentionally thin factory wrappers:
+
+```python
+@pytest.fixture
+def oapw_accessibility():
+    from oapw.verification.accessibility import AccessibilityChecker
+    return AccessibilityChecker()        # default WCAG 2.0 AA config
+
+@pytest.fixture
+def oapw_visual(tmp_path):
+    from oapw.verification.visual import VisualChecker
+    return VisualChecker(baselines_dir=tmp_path / "baselines")  # test-scoped dir
+```
+
+Each call creates a fresh instance (function scope) so tests are fully isolated. `oapw_visual` uses pytest's `tmp_path` fixture to ensure baselines never persist between test runs.
+
+### `oapw init` Scaffolding
+
+`oapw init` writes four files into the current directory:
+
+```
+conftest.py           — base_url session fixture + auth_page hybrid fixture
+.env.example          — documented OAPW_* variables with sensible defaults
+tests/__init__.py     — makes tests/ a package
+tests/test_example.py — runnable example using oapw_page
+```
+
+The intent is "zero to first passing test in under 2 minutes" for a new project. The scaffolded `conftest.py` picks up `OAPW_APP_BASE_URL` from the environment, so CI and local runs share the same config file.
+
+### GitHub Actions CI Architecture
+
+The bundled `.github/workflows/oapw.yml` uses a two-job design:
+
+```
+unit-tests (always)
+│  ├── checkout + Python 3.12 + Poetry
+│  ├── poetry install --with dev
+│  ├── playwright install chromium
+│  ├── ollama serve + pull qwen2.5:3b + nomic-embed-text
+│  ├── pytest tests/unit/ -q
+│  └── pytest tests/eval/ -q
+│
+integration-tests (if OAPW_RUN_INTEGRATION == 'true')
+│  needs: unit-tests
+│  ├── poetry install --with dev --extras full
+│  ├── oapw qa "smoke test the home page" --top-k 3 --no-investigate
+│  ├── pytest tests/integration/ -q
+│  └── allure-results upload (14-day retention)
+```
+
+The integration job is disabled by default — enable it by setting `OAPW_RUN_INTEGRATION=true` as a repository variable. This prevents integration tests from running against `localhost:3000` in fork PRs where no app is running.
+
+### Optional Extras System
+
+```toml
+[tool.poetry.extras]
+knowledge = ["chromadb"]
+visual    = ["Pillow"]
+allure    = ["allure-pytest"]
+full      = ["chromadb", "Pillow", "allure-pytest"]
+```
+
+Each extra is independently installable. The code that uses them imports lazily with graceful degradation:
+- `VisualChecker` falls back to byte-diff comparison when Pillow is not installed
+- `KnowledgeStore` raises `RuntimeError("chromadb is not installed")` with a helpful message
+- Allure is a pytest plugin — it activates automatically when installed
 
 ---
 

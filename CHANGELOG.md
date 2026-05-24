@@ -17,6 +17,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [0.1.0] — 2026-05-24
 
+## [Phase 10] — Productionization
+### Added
+- **pytest plugin extras** — four new fixtures registered via the `pytest11` entry point:
+  - `oapw_accessibility` → `AccessibilityChecker()` for in-test WCAG audits
+  - `oapw_performance` → `PerformanceCapture()` for in-test Web Vitals measurement
+  - `oapw_visual(tmp_path)` → `VisualChecker(baselines_dir=tmp_path/"baselines")` scoped per test
+  - `oapw_qa_agent` → `QaOrchestrator(print_report=False)` for in-test QA agent runs
+- **`pyproject.toml` optional extras**:
+  - `allure` — adds `allure-pytest` for Allure report generation
+  - `visual` — adds `Pillow` for pixel-diff visual regression
+  - `full` — installs all optional extras at once (`poetry install --extras full`)
+- **`oapw init` CLI command** — scaffolds a new project into the current directory:
+  - `conftest.py` — `base_url` session fixture + `auth_page` hybrid fixture
+  - `.env.example` — documented environment variables template
+  - `tests/__init__.py` — package marker
+  - `tests/test_example.py` — example test using `oapw_page`
+- **`.github/workflows/oapw.yml`** — GitHub Actions CI template:
+  - `unit-tests` job — always runs; installs Ollama, pulls models, runs `tests/unit/` + `tests/eval/`
+  - `integration-tests` job — gated on `OAPW_RUN_INTEGRATION=true` repo variable; runs `oapw qa` smoke + `tests/integration/` + uploads Allure results (14-day retention)
+- **`examples/`** — ready-to-copy reference test files:
+  - `examples/test_login_flow.py` — 6 tests covering all fixtures (page, factory, accessibility, performance, visual)
+  - `examples/test_qa_agent_example.py` — 2 QA agent tests (smoke, auth regression)
+  - `examples/conftest.py` — `base_url` + `auth_page` fixtures for example projects
+### Tests added
+- `tests/unit/test_plugin_fixtures.py` — 31 tests verifying class instantiation, interface contracts (coroutine methods, attribute types, default values), and plugin registration markers for all four new fixtures
+- **Total suite: 533 tests (519 unit + 14 eval), all passing**
+
+---
+
 ## [Phase 9] — Multi-Faceted Verification
 ### Added
 - `verification/accessibility.py`: `AccessibilityChecker` — injects axe-core via Playwright, audits WCAG 2.0 AA; `AccessibilityReport` with impact-grouped violations and `assert_no_critical()` / `assert_no_serious()`

@@ -142,6 +142,13 @@ Expected output from `oapw doctor`:
 - **VisualChecker**: pixel-diff screenshot regression — auto-captures baseline on first run; Pillow-powered diff highlight; optional LLM description of visual changes
 - All three integrate cleanly with pytest: each returns a typed result object with `assert_*` convenience methods
 
+### Phase 10 — Productionization
+- **4 new pytest fixtures** — `oapw_accessibility`, `oapw_performance`, `oapw_visual`, `oapw_qa_agent` — wire the verification classes and QA agent into pytest with zero boilerplate
+- **Optional extras** — `allure` (Allure reports), `visual` (Pillow pixel-diff), `full` (all extras); install with `poetry install --extras full`
+- **`oapw init`** — scaffolds a new project (conftest.py, .env.example, tests/) in one command
+- **GitHub Actions template** — `.github/workflows/oapw.yml` with unit + optional integration jobs and Allure upload
+- **Example projects** — `examples/` with full working test files for every fixture
+
 ### Phase 8 — QA Agent Mode
 - **QaOrchestrator**: autonomous agent pipeline — parse goal → select tests → execute → judge → investigate → report
 - **GoalParser**: converts "run login regression on QA" into structured intent (scope, feature areas, environment)
@@ -166,10 +173,25 @@ Expected output from `oapw doctor`:
 | Ollama | latest |
 | RAM | ≥ 8 GB |
 
-### Full install (with knowledge base support)
+### Scaffold a new project (recommended starting point)
 
 ```bash
-# Install with ChromaDB for the knowledge base and L3 cache
+# After installing oapw, bootstrap a new test project in one step
+oapw init
+# Creates: conftest.py, .env.example, tests/__init__.py, tests/test_example.py
+```
+
+### Full install (with knowledge base + all extras)
+
+```bash
+# ChromaDB (knowledge base + L3 cache) + Allure reports + Pillow visual diffs
+poetry install --extras full
+poetry run playwright install chromium
+```
+
+### Knowledge base only
+
+```bash
 poetry install --extras knowledge
 poetry run playwright install chromium
 ```
@@ -182,6 +204,15 @@ poetry run playwright install chromium
 ```
 
 > The knowledge base and L3 semantic cache degrade gracefully when ChromaDB is not installed — the rest of the framework works fine.
+
+### Available extras
+
+| Extra | Installs | Purpose |
+|---|---|---|
+| `knowledge` | `chromadb` | Vector store, L3 semantic cache, RAG |
+| `visual` | `Pillow` | Pixel-diff visual regression |
+| `allure` | `allure-pytest` | Allure HTML test reports |
+| `full` | all of the above | Everything |
 
 ### Ollama setup
 
@@ -231,6 +262,7 @@ See **[docs/configuration.md](docs/configuration.md)** for the full reference.
 ```
 oapw doctor               Verify all runtime dependencies
 oapw version              Print framework version
+oapw init                 Scaffold a new project (conftest.py, .env.example, tests/)
 
 oapw cache stats          Show L1/L2 hit rates and sizes
 oapw cache prune          Remove expired entries from SQLite cache
@@ -243,6 +275,9 @@ oapw kb coverage          Show which Jira tickets have traced tests
 
 oapw auth atlassian       Store Atlassian API token in OS keyring
 oapw auth bitbucket       Store Bitbucket App Password in OS keyring
+
+oapw run goal GOAL        Run the AI agent to achieve a goal in a live browser
+oapw qa GOAL              Run the autonomous QA Agent for a natural-language goal
 ```
 
 See **[docs/cli-reference.md](docs/cli-reference.md)** for full option details and examples.
@@ -294,6 +329,42 @@ snippets = await retriever.retrieve("login authentication", linked_jira=["AUTH-4
 context = retriever.format_context(snippets)
 # Inject `context` into your test generation prompt
 ```
+
+### pytest fixtures (zero-boilerplate)
+
+All fixtures are registered automatically when oapw is installed. Just request them in your test:
+
+```python
+async def test_login_full(oapw_page, oapw_factory, oapw_accessibility, oapw_performance):
+    creds = oapw_factory.build("credentials")
+
+    await oapw_page.goto("http://localhost:3000/login")
+    await oapw_page.ai(f"Fill the email input with '{creds.email}'")
+    await oapw_page.ai(f"Fill the password input with '{creds.password}'")
+    await oapw_page.ai("Click Sign In")
+    await oapw_page.ai_assert("I am on the dashboard")
+
+    # Accessibility audit
+    report = await oapw_accessibility.check(oapw_page.page)
+    report.assert_no_critical()
+
+    # Performance budget
+    metrics = await oapw_performance.capture(oapw_page.page)
+    metrics.assert_fcp_under(2000)
+```
+
+| Fixture | Type | Description |
+|---|---|---|
+| `oapw_page` | `AiPage` | Browser page with `.ai()`, `.ai_assert()`, `.ai_extract()` |
+| `oapw_api_context` | `APIRequestContext` | API-only context (no browser) |
+| `oapw_hybrid` | `HybridContext` | Browser + API sharing the same cookie jar |
+| `oapw_factory` | `FactoryRegistry` | Test data generators (user, credentials, address, …) |
+| `oapw_pii_masker` | `PiiMasker` | Redact secrets from logs |
+| `oapw_config` | `OapwConfig` | Framework config (reset after each test) |
+| `oapw_accessibility` | `AccessibilityChecker` | WCAG 2.0 AA axe-core audit |
+| `oapw_performance` | `PerformanceCapture` | Web Vitals (TTFB, FCP, LCP) |
+| `oapw_visual` | `VisualChecker` | Pixel-diff screenshot regression |
+| `oapw_qa_agent` | `QaOrchestrator` | Autonomous QA agent for in-test regression runs |
 
 ### Traceability
 

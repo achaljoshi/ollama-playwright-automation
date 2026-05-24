@@ -71,6 +71,61 @@ oapw 0.1.0
 
 ---
 
+## `oapw init`
+
+Scaffold a new oapw test project in the current directory.
+
+```bash
+oapw init [OPTIONS]
+```
+
+| Option | Short | Default | Description |
+|---|---|---|---|
+| `--force` | `-f` | `false` | Overwrite files that already exist |
+
+**Files created:**
+
+| File | Purpose |
+|---|---|
+| `conftest.py` | `base_url` session fixture (reads `OAPW_APP_BASE_URL`) + `auth_page` hybrid fixture |
+| `.env.example` | Documented `OAPW_*` environment variables with sensible defaults |
+| `tests/__init__.py` | Package marker so pytest collects the directory |
+| `tests/test_example.py` | Minimal passing example test using `oapw_page` |
+
+**Example:**
+
+```bash
+mkdir my-qa-project && cd my-qa-project
+oapw init
+```
+
+```
+✓ conftest.py
+✓ .env.example
+✓ tests/__init__.py
+✓ tests/test_example.py
+Done! Next steps:
+  1. Copy .env.example → .env and fill in your app URL
+  2. poetry run pytest tests/ -v
+```
+
+After running `oapw init`, copy `.env.example` to `.env` and set:
+
+```env
+OAPW_APP_BASE_URL=http://localhost:3000
+OAPW_OLLAMA_DEFAULT_MODEL=qwen2.5:3b
+```
+
+Then run:
+
+```bash
+poetry run pytest tests/ -v
+```
+
+> If a file already exists, `oapw init` skips it unless `--force` is passed. This makes it safe to re-run after upgrading oapw.
+
+---
+
 ## `oapw cache`
 
 Cache management commands.
@@ -492,8 +547,10 @@ oapw --install-completion fish
 
 ## Using oapw in CI
 
+oapw ships with a ready-made GitHub Actions workflow at `.github/workflows/oapw.yml` (added by `oapw init`). It runs unit + eval tests on every push, and optionally runs integration tests when `OAPW_RUN_INTEGRATION=true` is set as a repository variable.
+
 ```yaml
-# .github/workflows/test.yml (example)
+# .github/workflows/test.yml (custom example)
 - name: Sync knowledge base
   env:
     OAPW_ATLASSIAN_EMAIL: ${{ secrets.ATLASSIAN_EMAIL }}
@@ -502,6 +559,11 @@ oapw --install-completion fish
     echo "${{ secrets.ATLASSIAN_TOKEN }}" | \
       poetry run oapw auth atlassian --email $OAPW_ATLASSIAN_EMAIL --token -
     poetry run oapw kb sync --jira "project = AUTH AND sprint in openSprints()"
+
+- name: Run QA Agent smoke test
+  env:
+    OAPW_APP_BASE_URL: ${{ vars.OAPW_APP_BASE_URL }}
+  run: poetry run oapw qa "smoke test the home page" --top-k 5 --no-investigate
 
 - name: Run tests
   run: poetry run pytest tests/
