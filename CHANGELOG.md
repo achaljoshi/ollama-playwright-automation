@@ -17,6 +17,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [0.1.0] — 2026-05-24
 
+## [Phase 9] — Multi-Faceted Verification
+### Added
+- `verification/accessibility.py`: `AccessibilityChecker` — injects axe-core via Playwright, audits WCAG 2.0 AA; `AccessibilityReport` with impact-grouped violations and `assert_no_critical()` / `assert_no_serious()`
+- `verification/performance.py`: `PerformanceCapture` — captures Web Vitals (TTFB, FCP, LCP) and resource timing from the browser Performance API; `PerformanceMetrics` with `assert_ttfb_under()`, `assert_fcp_under()`, `assert_lcp_under()` helpers
+- `verification/visual.py`: `VisualChecker` — pixel-diff screenshot comparison (Pillow optional, falls back to byte diff); auto-captures baseline on first run; `update_baseline()`; optional Ollama vision model description of changes; `VisualDiff.assert_within_threshold()`
+### Tests added
+- `tests/unit/test_verification.py`: 45 unit tests covering all three verification components
+
+---
+
 ## [Phase 8] — QA Agent Mode
 ### Added
 - `qa_agent/models.py`: `QaGoal`, `TestScope`, `TestCandidate`, `Judgment`, `Investigation`, `KnownIssue`, `TestRunResult`, `QaRunResult` (with `pass_rate`, `real_bugs`, `failed_steps` helpers)

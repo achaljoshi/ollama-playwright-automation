@@ -86,6 +86,7 @@ oapw is a **local-first** AI automation framework. All AI inference runs via Oll
 | **Test generation** | `generators/` | JiraTestGenerator, UserStoryGenerator, SmokeTestCrawler, EdgeCaseMutator |
 | **Agent orchestration** | `agents/runner.py` | AgentRunner, LoopGuard, HookRegistry — plan→execute→guard pipeline |
 | **QA Agent** | `qa_agent/` | GoalParser, TestSelector, JudgmentEngine, Investigator, QaMemory, SmartExecutor, QaOrchestrator |
+| **Verification** | `verification/` | AccessibilityChecker (axe-core), PerformanceCapture (Web Vitals), VisualChecker (pixel-diff) |
 | **Config** | `core/config.py` | pydantic-settings, OAPW_* env prefix |
 | **CLI** | `cli/main.py` | typer + rich CLI |
 

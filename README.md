@@ -136,6 +136,12 @@ Expected output from `oapw doctor`:
 - **LLM replan**: on step failure, optionally asks the LLM to generate revised remaining steps
 - **`oapw run goal`**: CLI command to run the AI agent against a live browser
 
+### Phase 9 — Multi-Faceted Verification
+- **AccessibilityChecker**: injects axe-core, runs WCAG 2.0 AA audit, groups violations by impact (critical/serious/moderate/minor)
+- **PerformanceCapture**: captures TTFB, FCP, LCP, DOM timings and resource sizes from the browser Performance API — no external dependencies
+- **VisualChecker**: pixel-diff screenshot regression — auto-captures baseline on first run; Pillow-powered diff highlight; optional LLM description of visual changes
+- All three integrate cleanly with pytest: each returns a typed result object with `assert_*` convenience methods
+
 ### Phase 8 — QA Agent Mode
 - **QaOrchestrator**: autonomous agent pipeline — parse goal → select tests → execute → judge → investigate → report
 - **GoalParser**: converts "run login regression on QA" into structured intent (scope, feature areas, environment)
