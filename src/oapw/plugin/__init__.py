@@ -134,3 +134,70 @@ def oapw_pii_masker():
     """Provide the PiiMasker singleton for security-sensitive tests."""
     from oapw.security.pii import get_pii_masker
     return get_pii_masker()
+
+
+# ── Phase 9 verification fixtures ────────────────────────────────────────────
+
+@pytest.fixture
+def oapw_accessibility():
+    """Provide an AccessibilityChecker for WCAG audits.
+
+    Example::
+
+        async def test_login_a11y(oapw_page, oapw_accessibility):
+            await oapw_page.goto("/login")
+            report = await oapw_accessibility.check(oapw_page.page)
+            report.assert_no_critical()
+    """
+    from oapw.verification.accessibility import AccessibilityChecker
+    return AccessibilityChecker()
+
+
+@pytest.fixture
+def oapw_performance():
+    """Provide a PerformanceCapture for Web Vitals measurement.
+
+    Example::
+
+        async def test_homepage_perf(oapw_page, oapw_performance):
+            await oapw_page.goto("/")
+            metrics = await oapw_performance.capture(oapw_page.page)
+            metrics.assert_ttfb_under(600)
+            metrics.assert_fcp_under(1500)
+    """
+    from oapw.verification.performance import PerformanceCapture
+    return PerformanceCapture()
+
+
+@pytest.fixture
+def oapw_visual(tmp_path):
+    """Provide a VisualChecker scoped to the test's tmp_path.
+
+    On first run the baseline is captured automatically.
+    On subsequent runs a pixel diff is computed.
+
+    Example::
+
+        async def test_homepage_visual(oapw_page, oapw_visual):
+            await oapw_page.goto("/")
+            diff = await oapw_visual.compare(oapw_page.page, "homepage")
+            diff.assert_within_threshold()
+    """
+    from oapw.verification.visual import VisualChecker
+    return VisualChecker(baselines_dir=tmp_path / "baselines")
+
+
+# ── QA Agent fixture ──────────────────────────────────────────────────────────
+
+@pytest.fixture
+def oapw_qa_agent():
+    """Provide a QaOrchestrator for in-test QA agent runs.
+
+    Example::
+
+        async def test_login_regression(oapw_qa_agent):
+            result = await oapw_qa_agent.run("smoke test the login flow")
+            assert result.pass_rate == 1.0
+    """
+    from oapw.qa_agent.orchestrator import QaOrchestrator
+    return QaOrchestrator(print_report=False)

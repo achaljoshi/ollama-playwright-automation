@@ -1,0 +1,144 @@
+# ── OAPW CI Workflow ────────────────────────────────────────────────────────
+# Runs unit + eval tests on every push / PR.
+# For integration tests against a live app, see the integration-test job
+# (disabled by default — enable by setting OAPW_RUN_INTEGRATION=true).
+#
+# Required secrets / variables:
+#   OAPW_OLLAMA_BASE_URL  (if using remote Ollama) — defaults to localhost
+#   OAPW_APP_BASE_URL     — URL of the application under test
+#
+# The workflow:
+#   1. Starts Ollama (pulls a small model for unit tests)
+#   2. Installs the oapw package
+#   3. Runs unit + eval tests
+#   4. (Optional) Runs integration tests against the app
+#   5. Uploads Allure results (if allure extra is installed)
+
+name: oapw CI
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+    branches: [main]
+
+env:
+  OAPW_OLLAMA_BASE_URL: "http://localhost:11434"
+  OAPW_OLLAMA_DEFAULT_MODEL: "qwen2.5:3b"
+  OAPW_EMBED_MODEL: "nomic-embed-text"
+  OAPW_BROWSER_HEADLESS: "true"
+  OAPW_APP_BASE_URL: ${{ vars.OAPW_APP_BASE_URL || 'http://localhost:3000' }}
+
+jobs:
+  unit-tests:
+    name: Unit & eval tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Poetry
+        run: pip install poetry
+
+      - name: Install dependencies
+        run: poetry install --with dev
+
+      - name: Install Playwright browsers
+        run: poetry run playwright install chromium --with-deps
+
+      # ── Start Ollama ────────────────────────────────────────────────────────
+      - name: Install Ollama
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          ollama serve &
+          sleep 5
+
+      - name: Pull LLM model
+        run: ollama pull ${{ env.OAPW_OLLAMA_DEFAULT_MODEL }}
+
+      - name: Pull embedding model
+        run: ollama pull ${{ env.OAPW_EMBED_MODEL }}
+
+      # ── Run tests ───────────────────────────────────────────────────────────
+      - name: Run unit tests
+        run: poetry run pytest tests/unit/ -q --tb=short
+
+      - name: Run eval tests
+        run: poetry run pytest tests/eval/ -q --tb=short
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: |
+            .pytest_cache/
+          retention-days: 7
+
+  integration-tests:
+    name: Integration tests (app required)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Enable by setting OAPW_RUN_INTEGRATION=true in repo vars
+    if: vars.OAPW_RUN_INTEGRATION == 'true'
+    needs: unit-tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Poetry
+        run: pip install poetry
+
+      - name: Install all extras
+        run: poetry install --with dev --extras full
+
+      - name: Install Playwright browsers
+        run: poetry run playwright install chromium --with-deps
+
+      - name: Install Ollama and pull models
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          ollama serve &
+          sleep 5
+          ollama pull ${{ env.OAPW_OLLAMA_DEFAULT_MODEL }}
+          ollama pull ${{ env.OAPW_EMBED_MODEL }}
+
+      - name: Run QA Agent smoke test
+        env:
+          OAPW_APP_BASE_URL: ${{ env.OAPW_APP_BASE_URL }}
+        run: |
+          poetry run oapw qa "smoke test the home page" --top-k 3 --no-investigate
+
+      - name: Run integration tests
+        env:
+          OAPW_APP_BASE_URL: ${{ env.OAPW_APP_BASE_URL }}
+        run: poetry run pytest tests/integration/ -q --tb=short
+
+      - name: Generate Allure report
+        if: always()
+        run: |
+          pip install allure-pytest
+          poetry run pytest tests/integration/ \
+            --alluredir=allure-results \
+            --no-header -q || true
+
+      - name: Upload Allure results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results
+          path: allure-results/
+          retention-days: 14

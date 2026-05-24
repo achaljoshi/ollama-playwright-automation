@@ -584,6 +584,125 @@ async def _qa_run(
         raise typer.Exit(1)
 
 
+# ── oapw init ─────────────────────────────────────────────────────────────────
+
+@app.command("init")
+def init_project(
+    target: Path = typer.Argument(Path("."), help="Directory to initialise (default: current)"),
+    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing files"),
+) -> None:
+    """Bootstrap an oapw project in TARGET directory.
+
+    Creates:
+      - conftest.py          — pytest fixtures
+      - .env.example         — environment variable template
+      - tests/__init__.py    — test package
+      - tests/test_example.py — starter test
+
+    Example::
+
+        oapw init my-qa-project
+        cd my-qa-project
+        cp .env.example .env && editor .env
+        poetry run pytest tests/
+    """
+    target = target.resolve()
+    target.mkdir(parents=True, exist_ok=True)
+
+    files: dict[str, str] = {
+        "conftest.py": _INIT_CONFTEST,
+        ".env.example": _INIT_ENV_EXAMPLE,
+        "tests/__init__.py": "",
+        "tests/test_example.py": _INIT_TEST_EXAMPLE,
+    }
+
+    written: list[str] = []
+    skipped: list[str] = []
+
+    for rel_path, content in files.items():
+        dest = target / rel_path
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if dest.exists() and not force:
+            skipped.append(rel_path)
+            continue
+        dest.write_text(content, encoding="utf-8")
+        written.append(rel_path)
+
+    console.print(f"\n[bold]Initialised oapw project in[/] {target}\n")
+    for f in written:
+        console.print(f"  [green]created[/] {f}")
+    for f in skipped:
+        console.print(f"  [yellow]skipped[/] {f} (already exists — use --force to overwrite)")
+
+    console.print(
+        "\n[dim]Next steps:[/]\n"
+        f"  cd {target}\n"
+        "  cp .env.example .env\n"
+        "  # Edit .env with your app URL and Ollama settings\n"
+        "  poetry run pytest tests/\n"
+    )
+
+
+_INIT_CONFTEST = '''"""Project conftest — oapw fixtures are available automatically via the plugin."""
+
+from __future__ import annotations
+import os
+import pytest
+
+
+@pytest.fixture(scope="session")
+def base_url() -> str:
+    return os.getenv("OAPW_APP_BASE_URL", "http://localhost:3000")
+'''
+
+_INIT_ENV_EXAMPLE = """# oapw environment configuration — copy to .env and fill in your values
+OAPW_APP_BASE_URL=http://localhost:3000
+OAPW_APP_API_BASE_URL=http://localhost:3000/api
+
+OAPW_OLLAMA_BASE_URL=http://localhost:11434
+OAPW_OLLAMA_DEFAULT_MODEL=qwen2.5:3b
+OAPW_EMBED_MODEL=nomic-embed-text
+
+# Optional: Atlassian integration
+# OAPW_ATLASSIAN_URL=https://company.atlassian.net
+# OAPW_ATLASSIAN_EMAIL=you@company.com
+# OAPW_ATLASSIAN_API_TOKEN=your_token_here
+
+# Optional: browser settings
+OAPW_BROWSER_HEADLESS=true
+OAPW_BROWSER_SLOW_MO=0
+"""
+
+_INIT_TEST_EXAMPLE = '''"""Starter test — replace with your own scenarios."""
+
+from __future__ import annotations
+import pytest
+
+pytestmark = pytest.mark.asyncio
+
+
+async def test_home_page_loads(oapw_page, base_url):
+    """Smoke test: home page loads without errors."""
+    await oapw_page.goto(base_url)
+    await oapw_page.ai_assert("The page loaded successfully and is visible")
+
+
+async def test_home_page_accessibility(oapw_page, oapw_accessibility, base_url):
+    """Accessibility: home page should have no critical WCAG violations."""
+    await oapw_page.goto(base_url)
+    report = await oapw_accessibility.check(oapw_page.page)
+    report.assert_no_critical()
+
+
+async def test_home_page_performance(oapw_page, oapw_performance, base_url):
+    """Performance: TTFB < 2s, FCP < 3s."""
+    await oapw_page.goto(base_url)
+    metrics = await oapw_performance.capture(oapw_page.page)
+    metrics.assert_ttfb_under(2000)
+    metrics.assert_fcp_under(3000)
+'''
+
+
 # ── version ───────────────────────────────────────────────────────────────────
 
 @app.command()
