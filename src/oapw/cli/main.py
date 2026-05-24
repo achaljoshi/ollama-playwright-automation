@@ -190,21 +190,27 @@ def _print_cache_stats(stats: dict) -> None:
 def kb_sync(
     jira: Optional[str] = typer.Option(None, "--jira", help="JQL query, e.g. 'project = PROJ AND issuetype = Story'"),
     confluence: Optional[str] = typer.Option(None, "--confluence", help="CQL query, e.g. 'label = qa AND space = ENG'"),
+    repo: Optional[list[str]] = typer.Option(None, "--repo", help="Git repo URL (repeatable). e.g. --repo https://bitbucket.org/ws/backend --repo https://bitbucket.org/ws/frontend"),
     component: Optional[str] = typer.Option(None, "--component", help="Jira component name for Confluence weighting"),
-    max_results: int = typer.Option(50, "--max", help="Max items per source"),
+    branch: str = typer.Option("main", "--branch", help="Git branch for --repo syncs"),
+    username: Optional[str] = typer.Option(None, "--username", help="Bitbucket username (uses keyring credential)"),
+    max_results: int = typer.Option(50, "--max", help="Max items per Jira/Confluence source"),
 ) -> None:
-    """Sync Jira tickets and/or Confluence pages into the knowledge base."""
-    asyncio.run(_kb_sync(jira, confluence, component, max_results))
+    """Sync Jira tickets, Confluence pages, and/or code repos into the knowledge base."""
+    asyncio.run(_kb_sync(jira, confluence, repo or [], component, branch, username, max_results))
 
 
 async def _kb_sync(
     jira_jql: str | None,
     conf_cql: str | None,
+    repos: list[str],
     component: str | None,
+    branch: str,
+    username: str | None,
     max_results: int,
 ) -> None:
-    if not jira_jql and not conf_cql:
-        console.print("[yellow]Provide at least --jira or --confluence.[/]")
+    if not jira_jql and not conf_cql and not repos:
+        console.print("[yellow]Provide at least --jira, --confluence, or --repo.[/]")
         raise typer.Exit(1)
 
     if jira_jql:
@@ -232,6 +238,28 @@ async def _kb_sync(
             )
         except Exception as exc:
             console.print(f"[red]Confluence ingest failed:[/] {exc}")
+
+    if repos:
+        try:
+            from oapw.enterprise.code_ingest import CodeIngestor
+            ingestor = CodeIngestor()
+            for url in repos:
+                ingestor.add_repo(url, branch=branch, username=username or "")
+            console.print(f"[bold]Syncing {len(repos)} code repo(s):[/]")
+            results = await ingestor.sync_all()
+            for r in results:
+                if r.errors and not r.files_indexed:
+                    console.print(f"  [red]✗[/] {r.repo_name}: failed ({r.errors} errors)")
+                else:
+                    status = "[green]✓[/]" if not r.errors else "[yellow]⚠[/]"
+                    console.print(
+                        f"  {status} {r.repo_name}: "
+                        f"{r.files_indexed} files, {r.chunks_added} chunks"
+                        + (f", sha {r.sha[:8]}" if r.sha else "")
+                        + (f" ({r.errors} errors)" if r.errors else "")
+                    )
+        except Exception as exc:
+            console.print(f"[red]Code ingest failed:[/] {exc}")
 
 
 @kb_app.command("stats")
@@ -279,6 +307,19 @@ def kb_coverage() -> None:
 
 
 # ── auth sub-commands ─────────────────────────────────────────────────────────
+
+@auth_app.command("bitbucket")
+def auth_bitbucket(
+    username: str = typer.Option(..., "--username", "-u", help="Bitbucket username"),
+    password: Optional[str] = typer.Option(None, "--password", "-p", help="App Password (prompted if omitted)"),
+) -> None:
+    """Store your Bitbucket App Password in the OS keyring."""
+    if not password:
+        password = typer.prompt("Bitbucket App Password", hide_input=True)
+    from oapw.enterprise.connectors.bitbucket import save_credential
+    save_credential(username, password)
+    console.print(f"[green]✓[/] Credential saved for {username}. Use --username {username} with oapw kb sync --repo.")
+
 
 @auth_app.command("atlassian")
 def auth_atlassian(
