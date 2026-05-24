@@ -17,6 +17,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [0.1.0] — 2026-05-24
 
+## [Phase 7] — Agent System
+### Added
+- `agents/loop_guard.py`: `LoopGuard` with configurable budget cap and sliding-window cycle detection (`LoopViolation` exception)
+- `agents/hooks.py`: Human-in-loop hook system — `HookRegistry`, `HookEvent`, `HookDecision`, `HookContext`, `HookResponse`, `SilentHook`, `ConsoleHook`
+- `agents/models.py`: `RunStatus` enum + `RunResult` model (`ok` property, `failed_steps` helper)
+- `agents/runner.py`: `AgentRunner` — orchestrates Planner + Executor with loop guards; RETRY/OVERRIDE/ABORT/CONTINUE hook decisions; optional LLM replan on step failure
+- `prompts/replan.j2`: Jinja2 prompt template for post-failure replanning
+- `core/config.py`: `agent_max_steps`, `agent_max_step_retries`, `agent_loop_window` settings
+- `cli/main.py`: `oapw run goal` command with `--interactive` flag (activates `ConsoleHook`)
+### Tests added
+- `tests/unit/test_runner.py`: 34 unit tests covering LoopGuard, HookRegistry, SilentHook, RunResult, AgentRunner (retry, override, abort, loop detection, multi-step retries)
+
+---
+
 ### Phase 6 — Test Generator
 
 #### Added

@@ -127,6 +127,15 @@ Expected output from `oapw doctor`:
 - `EdgeCaseMutator` — 10 mutation types: `empty_input`, `boundary_values`, `special_characters`, `invalid_format`, `wrong_credentials`, `sql_injection_attempt`, `xss_attempt`, `concurrent_submission`, `session_expiry`, `max_length_exceeded`; per-mutation L2 cache; JSON-envelope LLM response with plain Python fallback
 - **`oapw generate` CLI sub-app** — `from-jira TICKET [--out DIR] [--mutate N]`, `from-story TEXT [--out DIR] [--feature NAME]`, `smoke URL [--out DIR] [--max-pages N]`
 
+### Phase 7 — Agent System
+- **AgentRunner**: top-level orchestrator tying Planner + Executor together with loop guards and human-in-loop hooks
+- **LoopGuard**: sliding-window cycle detection + hard step-budget cap to prevent runaway execution
+- **HookRegistry**: event-driven callback system — PLAN_READY, STEP_FAILED, LOOP_DETECTED, etc.
+- **Hook decisions**: CONTINUE / ABORT / RETRY / OVERRIDE — human or automated handler returns what the runner should do next
+- **ConsoleHook**: interactive stdin/stdout hook for `oapw run --interactive` mode
+- **LLM replan**: on step failure, optionally asks the LLM to generate revised remaining steps
+- **`oapw run goal`**: CLI command to run the AI agent against a live browser
+
 ---
 
 ## Installation

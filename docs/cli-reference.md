@@ -416,6 +416,36 @@ Crawling https://staging.your-app.com (max 20 pages)...
 
 ---
 
+## oapw run
+
+Run the AI agent to achieve a natural-language goal in a live browser.
+
+### `oapw run goal`
+
+```
+oapw run goal GOAL --url URL [OPTIONS]
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `GOAL` | required | Natural language goal to achieve |
+| `--url` / `-u` | required | Starting URL to navigate to |
+| `--model` / `-m` | config | Ollama model override |
+| `--max-steps` | `50` | Hard cap on total steps |
+| `--max-retries` | `2` | Retries per failed step |
+| `--interactive` / `-i` | `false` | Enable human-in-loop console prompts |
+| `--headless/--no-headless` | headless | Run browser headlessly or visibly |
+
+**Example:**
+```bash
+oapw run goal "Add the first product to cart and verify cart badge shows 1" \
+    --url http://localhost:3000/shop --no-headless
+```
+
+With `--interactive`, the agent pauses on failures and asks you: Continue / Abort / Retry / Override.
+
+---
+
 ## Shell Completion
 
 Enable tab completion for your shell:
