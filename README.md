@@ -113,6 +113,13 @@ Expected output from `oapw doctor`:
 - **Code repo ingestion** — C# + TypeScript/React language-aware parsers, incremental SHA sync
 - Bitbucket App Password auth via OS keyring
 
+### Phase 5 — Hybrid API+UI & Test Data
+- `ApiClient` — Playwright `APIRequestContext` wrapper with response caching and auth header injection
+- `HybridContext` — shared cookie jar between browser session and API client; `login_via_api()` / `verify_via_api()` for mixed UI+API tests
+- `BaseFactory` + 5 ready-made factories — `UserFactory`, `LoginCredentialsFactory`, `AddressFactory`, `CreditCardFactory`, `ProductFactory`; Pydantic field-name heuristics auto-generate realistic values; `FactoryRegistry` for central lookup
+- `PiiMasker` — 10 regex patterns (JWT, bearer, AWS keys, email, phone, payment card, SSN, NI, password); `mask()` and `mask_dict()` for safe logging
+- **pytest plugin** — install-once entry point; ready-made fixtures: `oapw_page`, `oapw_hybrid`, `oapw_factory`, `oapw_api_context`, `oapw_pii_masker`, `oapw_config`
+
 ---
 
 ## Installation

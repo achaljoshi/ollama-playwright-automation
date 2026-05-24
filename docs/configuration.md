@@ -52,6 +52,13 @@ All settings are read by `OapwConfig` (pydantic-settings) in this priority order
 |---|---|---|
 | `OAPW_RAM_GB` | `8` | Available RAM in GB — used by `oapw doctor` to validate hardware |
 
+### Application under test
+
+| Variable | Default | Description |
+|---|---|---|
+| `OAPW_APP_BASE_URL` | `http://localhost:3000` | Base URL of the application under test (used by ApiClient) |
+| `OAPW_APP_API_BASE_URL` | `` | API base URL if different from app_base_url |
+
 ### Atlassian
 
 | Variable | Default | Description |

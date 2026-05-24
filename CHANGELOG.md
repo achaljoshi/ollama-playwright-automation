@@ -18,6 +18,52 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [0.1.0] — 2026-05-24
 
+### Phase 5 — Hybrid API+UI & Test Data
+
+#### Added
+- **`hybrid/api_client.py`** — `ApiClient` wrapping Playwright `APIRequestContext`
+  - GET/POST/PUT/PATCH/DELETE helpers with response deserialization
+  - Optional response caching via `CacheManager`
+  - Auth header injection (bearer token or session cookie forwarding)
+- **`hybrid/context.py`** — `HybridContext` combining `AiPage` and `ApiClient`
+  - Shared cookie jar between browser and API request context
+  - `login_via_api(credentials)` — authenticates via API, shares session with browser
+  - `verify_via_api(endpoint)` — performs API assertion alongside UI interaction
+- **`hybrid/__init__.py`** — exports `ApiClient`, `HybridContext`
+- **`factories/base.py`** — `BaseFactory` with Pydantic field-name heuristics
+  - Auto-generates realistic values from field names (email, phone, name, url, etc.)
+  - `build(**overrides)` — returns a populated model instance
+  - `build_batch(n, **overrides)` — returns a list of n instances
+- **`factories/common.py`** — five ready-made factories and a registry
+  - `UserFactory` — username, email, password, first_name, last_name
+  - `LoginCredentialsFactory` — email + password pair
+  - `AddressFactory` — street, city, state, zip_code, country
+  - `CreditCardFactory` — card number, expiry, cvv, holder name
+  - `ProductFactory` — name, description, price, sku, category
+  - `FactoryRegistry` — central lookup: `registry.get("user").build()`
+- **`factories/__init__.py`** — exports all factories and `FactoryRegistry`
+- **`security/pii.py`** — `PiiMasker` with 10 regex patterns
+  - JWT tokens, bearer tokens, AWS access keys, email addresses, phone numbers
+  - Payment card numbers, Social Security Numbers, UK National Insurance numbers, passwords
+  - `mask(text)` → redacted string; `mask_dict(data)` → recursively masked dict
+- **`security/__init__.py`** — exports `PiiMasker`
+- **`plugin/__init__.py`** — pytest plugin registered as `oapw` entry point
+  - `oapw_config` — session-scoped `OapwConfig` fixture
+  - `oapw_page` — function-scoped `AiPage` fixture (manages browser lifecycle)
+  - `oapw_api_context` — function-scoped `ApiClient` fixture
+  - `oapw_hybrid` — function-scoped `HybridContext` fixture
+  - `oapw_factory` — function-scoped `FactoryRegistry` fixture
+  - `oapw_pii_masker` — session-scoped `PiiMasker` fixture
+- **`core/config.py`** — added `app_base_url` and `app_api_base_url` fields (`OAPW_APP_BASE_URL`, `OAPW_APP_API_BASE_URL`)
+- **`pyproject.toml`** — registered pytest plugin: `[tool.poetry.plugins."pytest11"] oapw = "oapw.plugin"`
+
+#### Tests added
+- `tests/unit/test_hybrid.py` — 26 tests (ApiClient, HybridContext, cookie sharing)
+- `tests/unit/test_factories.py` — 54 tests (all five factories, BaseFactory heuristics, FactoryRegistry)
+- `tests/unit/test_pii.py` — 41 tests (all 10 masking patterns, mask_dict recursion)
+
+---
+
 ### Phase 4 Extension — Code Repository Ingestion
 
 #### Added

@@ -75,6 +75,7 @@ oapw is a **local-first** AI automation framework. All AI inference runs via Oll
 | **Cache L2** | `cache/l2_disk.py` | SQLite WAL, survives process restarts |
 | **Cache L3** | `cache/l3_semantic.py` | ChromaDB semantic match (≥0.92 cosine) |
 | **Cache manager** | `cache/manager.py` | Unified interface, bucket-level TTLs |
+| **Hybrid API+UI** | `hybrid/` | Cookie-sharing ApiClient + HybridContext for combined tests |
 | **Embeddings** | `knowledge/embeddings.py` | Ollama nomic-embed-text with L2 cache |
 | **Vector store** | `knowledge/vector_store.py` | ChromaDB cosine-similarity store |
 | **RAG retrieval** | `knowledge/rag.py` | Search + Jira boost + context formatting |
