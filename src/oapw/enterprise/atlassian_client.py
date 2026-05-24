@@ -115,12 +115,7 @@ class AtlassianClient:
         raw = f"atlassian:{path}:{params or {}}"
         return hashlib.blake2b(raw.encode(), digest_size=16).hexdigest()
 
-    async def _get(self, path: str, params: dict | None = None) -> Any:
-        key = self._cache_key(path, params)
-        cached = self._get_cache().get("confluence", key)
-        if cached is not None:
-            return cached
-
+    def _assert_configured(self) -> None:
         if not self._base_url or not self._api_token:
             raise RuntimeError(
                 "Atlassian credentials not configured. "
@@ -128,11 +123,25 @@ class AtlassianClient:
                 "oapw auth atlassian --email you@company.com"
             )
 
+    async def _get(self, path: str, params: dict | None = None) -> Any:
+        key = self._cache_key(path, params)
+        cached = self._get_cache().get("confluence", key)
+        if cached is not None:
+            return cached
+
+        self._assert_configured()
         resp = await self._get_http().get(path, params=params)
         resp.raise_for_status()
         data = resp.json()
         self._get_cache().set("confluence", key, data, ttl=_ATLASSIAN_TTL)
         return data
+
+    async def _post(self, path: str, body: dict) -> Any:
+        """POST request (not cached — used for search endpoints)."""
+        self._assert_configured()
+        resp = await self._get_http().post(path, json=body)
+        resp.raise_for_status()
+        return resp.json()
 
     async def close(self) -> None:
         if self._http:
@@ -163,10 +172,39 @@ class AtlassianClient:
         )
 
     async def search_jira(self, jql: str, max_results: int = 50) -> list[JiraTicket]:
-        data = await self._get(
-            "/rest/api/3/search",
-            params={"jql": jql, "maxResults": max_results, "fields": _JIRA_FIELDS},
-        )
+        """Search Jira using JQL.
+
+        Tries POST /rest/api/3/search/jql first (Jira Cloud 2024+),
+        falls back to POST /rest/api/3/search, then GET /rest/api/3/search.
+        """
+        fields_list = _JIRA_FIELDS.split(",")
+        body = {"jql": jql, "maxResults": max_results, "fields": fields_list}
+
+        data: dict | None = None
+        last_error: Exception | None = None
+
+        for endpoint, use_post, payload in [
+            ("/rest/api/3/search/jql", True, body),
+            ("/rest/api/3/search",     True, body),
+            ("/rest/api/3/search",     False, None),
+        ]:
+            try:
+                if use_post:
+                    data = await self._post(endpoint, payload)  # type: ignore[arg-type]
+                else:
+                    data = await self._get(
+                        endpoint,
+                        params={"jql": jql, "maxResults": max_results, "fields": _JIRA_FIELDS},
+                    )
+                break
+            except Exception as exc:
+                last_error = exc
+                logger.debug("Jira search via %s failed: %s", endpoint, exc)
+                continue
+
+        if data is None:
+            raise RuntimeError(f"JQL search failed: {last_error}")
+
         tickets: list[JiraTicket] = []
         for issue in data.get("issues", []):
             fields = issue.get("fields", {})

@@ -84,7 +84,13 @@ class TestExtractAc:
 
 class TestAtlassianClientCredentials:
     def test_no_creds_raises_on_get(self):
-        client = AtlassianClient(base_url="", email="", api_token="", cache=MagicMock())
+        # Patch config so the constructor doesn't pick up real credentials from .env
+        mock_cfg = MagicMock()
+        mock_cfg.atlassian_url = ""
+        mock_cfg.atlassian_email = ""
+        with patch("oapw.core.config.get_config", return_value=mock_cfg):
+            with patch("keyring.get_password", return_value=""):
+                client = AtlassianClient(base_url="", email="", api_token="", cache=MagicMock())
         client._cache.get.return_value = None
 
         import asyncio
