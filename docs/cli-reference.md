@@ -302,6 +302,120 @@ oapw auth bitbucket --username your-bb-username
 
 ---
 
+## `oapw generate`
+
+Test generation commands. Produce pytest files from Jira tickets, user stories, or live sites.
+
+### `oapw generate from-jira`
+
+Fetch a Jira ticket, retrieve KB context, generate a pytest file, and record a traceability link.
+
+```bash
+oapw generate from-jira TICKET [OPTIONS]
+```
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `TICKET` | str | — | Jira ticket key (e.g. `AUTH-42`) |
+| `--out` | path | `tests/generated/` | Output directory for the generated file |
+| `--model` | str | config default | Ollama model to use for generation |
+| `--no-kb` | flag | off | Skip KB RAG context retrieval |
+| `--mutate` | int | `0` | Number of edge-case mutations to generate per test |
+
+**Example:**
+
+```bash
+oapw generate from-jira AUTH-42 --out tests/e2e/ --mutate 3
+```
+
+**Example output:**
+
+```
+Fetching AUTH-42...
+  ✓ "Login with valid credentials" fetched
+Retrieving KB context (top 5)...
+  ✓ 5 snippets retrieved
+Generating test...
+  ✓ Syntax OK
+  ✓ Written: tests/e2e/test_auth_42_login_with_valid_credentials.py
+  ✓ Traceability recorded: AUTH-42 → test_auth_42_login_with_valid_credentials.py
+Generating 3 edge-case mutation(s)...
+  ✓ empty_input → test_auth_42_login_with_valid_credentials_empty_input.py
+  ✓ boundary_values → test_auth_42_login_with_valid_credentials_boundary_values.py
+  ✓ wrong_credentials → test_auth_42_login_with_valid_credentials_wrong_credentials.py
+```
+
+---
+
+### `oapw generate from-story`
+
+Generate a pytest file from plain-text user story input.
+
+```bash
+oapw generate from-story TEXT [OPTIONS]
+```
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `TEXT` | str | — | Plain-text user story (quote multi-word input) |
+| `--out` | path | `tests/generated/` | Output directory for the generated file |
+| `--feature` | str | derived from text | Feature name used in the output filename |
+| `--model` | str | config default | Ollama model to use for generation |
+
+**Example:**
+
+```bash
+oapw generate from-story \
+  "As a user I want to reset my password so that I can regain access to my account" \
+  --out tests/e2e/ \
+  --feature password_reset
+```
+
+**Example output:**
+
+```
+Generating test from user story...
+  ✓ Syntax OK
+  ✓ Written: tests/e2e/test_password_reset.py
+```
+
+---
+
+### `oapw generate smoke`
+
+Crawl a live site and generate a smoke test for each discovered page.
+
+```bash
+oapw generate smoke URL [OPTIONS]
+```
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `URL` | str | — | Starting URL to crawl |
+| `--out` | path | `tests/generated/` | Output directory for generated files |
+| `--max-pages` | int | `10` | Maximum number of pages to crawl |
+| `--model` | str | config default | Ollama model to use for generation |
+
+**Example:**
+
+```bash
+oapw generate smoke https://staging.your-app.com --out tests/smoke/ --max-pages 20
+```
+
+**Example output:**
+
+```
+Crawling https://staging.your-app.com (max 20 pages)...
+  ✓ /                     → test_smoke_root.py
+  ✓ /login                → test_smoke_login.py
+  ✓ /dashboard            → test_smoke_dashboard.py
+  ✓ /settings/profile     → test_smoke_settings_profile.py
+  ...
+  ✓ 14 smoke tests written to tests/smoke/
+```
+
+---
+
 ## Shell Completion
 
 Enable tab completion for your shell:

@@ -9,7 +9,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Planned
 - QA Agent mode (`oapw run "regress the login flow"` end-to-end)
-- Test generation from Jira user stories via `oapw generate`
 - Visual regression support (screenshot comparison with LLM judge)
 - Parallel repo sync (currently sequential to protect 8 GB RAM)
 - Config file support for listing many repos (`oapw kb sync --config repos.yml`)
@@ -17,6 +16,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ---
 
 ## [0.1.0] — 2026-05-24
+
+### Phase 6 — Test Generator
+
+#### Added
+- **`generators/models.py`** — GeneratedTest, MutatedTest, GenerationResult dataclasses
+- **`generators/from_jira.py`** — JiraTestGenerator: AtlassianClient ticket fetch → KB RAG context → LLM generate → syntax check → write file → traceability link
+- **`generators/from_user_story.py`** — UserStoryGenerator: plain-text story → pytest file with optional KB context
+- **`generators/crawler.py`** — SmokeTestCrawler: crawls live site (Playwright), follows internal links up to max_pages, generates smoke test per page
+- **`generators/mutator.py`** — EdgeCaseMutator: 10 mutation types per MUTATION_TYPES list; JSON-envelope LLM response with fallback to plain Python extraction; per-mutation L2 cache
+- **`prompts/generate_from_story.j2`** — user story → pytest prompt with KB context slot
+- **`prompts/generate_smoke.j2`** — URL + DOM context → smoke test prompt
+- **`prompts/generate_edge_cases.j2`** — original test + mutation type → JSON {description, code} prompt
+- **`cli/main.py`** — `oapw generate` sub-app with three commands:
+  - `oapw generate from-jira TICKET [--out DIR] [--model M] [--no-kb] [--mutate N]`
+  - `oapw generate from-story TEXT [--out DIR] [--feature NAME] [--model M]`
+  - `oapw generate smoke URL [--out DIR] [--max-pages N] [--model M]`
+
+#### Tests added
+- `tests/unit/test_generators.py` — 41 tests (all generators, helpers, caching, file writing, traceability, mutation types)
+- Total: 374 tests (360 unit + 14 eval)
+
+---
 
 ### Phase 5 — Hybrid API+UI & Test Data
 

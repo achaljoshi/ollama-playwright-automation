@@ -83,6 +83,7 @@ oapw is a **local-first** AI automation framework. All AI inference runs via Oll
 | **Code parsing** | `enterprise/code_parser.py` | C#, TypeScript, generic chunkers |
 | **Code ingestion** | `enterprise/code_ingest.py` | Git clone/pull + incremental SHA sync |
 | **Traceability** | `enterprise/traceability.py` | Test ↔ Jira ticket ↔ Confluence page links |
+| **Test generation** | `generators/` | JiraTestGenerator, UserStoryGenerator, SmokeTestCrawler, EdgeCaseMutator |
 | **Config** | `core/config.py` | pydantic-settings, OAPW_* env prefix |
 | **CLI** | `cli/main.py` | typer + rich CLI |
 

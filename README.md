@@ -120,6 +120,13 @@ Expected output from `oapw doctor`:
 - `PiiMasker` — 10 regex patterns (JWT, bearer, AWS keys, email, phone, payment card, SSN, NI, password); `mask()` and `mask_dict()` for safe logging
 - **pytest plugin** — install-once entry point; ready-made fixtures: `oapw_page`, `oapw_hybrid`, `oapw_factory`, `oapw_api_context`, `oapw_pii_masker`, `oapw_config`
 
+### Phase 6 — Test Generator
+- `JiraTestGenerator` (`oapw generate from-jira`) — fetches a Jira ticket, retrieves KB RAG context, generates a pytest file via LLM, syntax-checks it, writes it to disk, and records a traceability link
+- `UserStoryGenerator` (`oapw generate from-story`) — turns plain-text user stories into pytest files with optional KB context injection
+- `SmokeTestCrawler` (`oapw generate smoke`) — crawls a live site with Playwright, follows internal links up to `max_pages`, and generates a smoke test per discovered page
+- `EdgeCaseMutator` — 10 mutation types: `empty_input`, `boundary_values`, `special_characters`, `invalid_format`, `wrong_credentials`, `sql_injection_attempt`, `xss_attempt`, `concurrent_submission`, `session_expiry`, `max_length_exceeded`; per-mutation L2 cache; JSON-envelope LLM response with plain Python fallback
+- **`oapw generate` CLI sub-app** — `from-jira TICKET [--out DIR] [--mutate N]`, `from-story TEXT [--out DIR] [--feature NAME]`, `smoke URL [--out DIR] [--max-pages N]`
+
 ---
 
 ## Installation
