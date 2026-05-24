@@ -29,9 +29,11 @@ console = Console()
 cache_app = typer.Typer(name="cache", help="Cache management commands", no_args_is_help=True)
 kb_app = typer.Typer(name="kb", help="Knowledge base commands (Jira + Confluence)", no_args_is_help=True)
 auth_app = typer.Typer(name="auth", help="Credential management", no_args_is_help=True)
+generate_app = typer.Typer(name="generate", help="Test generation commands", no_args_is_help=True)
 app.add_typer(cache_app)
 app.add_typer(kb_app)
 app.add_typer(auth_app)
+app.add_typer(generate_app)
 
 
 # ── doctor ────────────────────────────────────────────────────────────────────
@@ -332,6 +334,117 @@ def auth_atlassian(
     from oapw.enterprise.atlassian_client import AtlassianClient
     AtlassianClient.save_token(email, token)
     console.print(f"[green]✓[/] Token saved for {email}. Set OAPW_ATLASSIAN_EMAIL={email} in your env.")
+
+
+# ── generate sub-commands ─────────────────────────────────────────────────────
+
+@generate_app.command("from-jira")
+def generate_from_jira(
+    ticket: str = typer.Argument(..., help="Jira ticket key, e.g. AUTH-42"),
+    out: Optional[Path] = typer.Option(None, "--out", "-o", help="Output directory for the generated test file"),
+    model: Optional[str] = typer.Option(None, "--model", "-m", help="Override Ollama model"),
+    no_kb: bool = typer.Option(False, "--no-kb", help="Skip knowledge base context retrieval"),
+    mutate: int = typer.Option(0, "--mutate", help="Also generate N edge-case mutations (0 = disabled)"),
+) -> None:
+    """Generate a pytest test file from a Jira ticket."""
+    asyncio.run(_generate_from_jira(ticket, out, model, not no_kb, mutate))
+
+
+async def _generate_from_jira(
+    ticket_key: str,
+    out_dir: Optional[Path],
+    model: Optional[str],
+    use_kb: bool,
+    mutate: int,
+) -> None:
+    from oapw.generators.from_jira import JiraTestGenerator
+    gen = JiraTestGenerator(model=model, use_kb=use_kb)
+    console.print(f"[bold]Generating test for[/] {ticket_key}…")
+    result = await gen.generate(ticket_key, out_dir=out_dir)
+    if not result.ok:
+        console.print(f"[red]Error:[/] {result.error}")
+        raise typer.Exit(1)
+    if result.written:
+        console.print(f"[green]✓[/] Written: {result.path}")
+    else:
+        console.print(result.test.code)
+
+    if mutate > 0 and result.test.code:
+        from oapw.generators.mutator import EdgeCaseMutator
+        console.print(f"[bold]Generating {mutate} edge-case mutation(s)…[/]")
+        mutator = EdgeCaseMutator(model=model)
+        mutations = await mutator.mutate(result.test, count=mutate)
+        if out_dir:
+            paths = mutator.write_mutations(mutations, out_dir=out_dir)
+            for p in paths:
+                console.print(f"  [green]✓[/] {p}")
+        else:
+            for m in mutations:
+                console.print(f"\n[bold]# Mutation: {m.mutation_type}[/] — {m.description}")
+                console.print(m.code)
+
+
+@generate_app.command("from-story")
+def generate_from_story(
+    story: str = typer.Argument(..., help="User story text, e.g. 'As a user I want to reset my password'"),
+    out: Optional[Path] = typer.Option(None, "--out", "-o", help="Output directory"),
+    feature: Optional[str] = typer.Option(None, "--feature", "-f", help="Short feature name for the filename"),
+    model: Optional[str] = typer.Option(None, "--model", "-m", help="Override Ollama model"),
+    no_kb: bool = typer.Option(False, "--no-kb", help="Skip knowledge base context retrieval"),
+) -> None:
+    """Generate a pytest test file from a plain-text user story."""
+    asyncio.run(_generate_from_story(story, out, feature or "", model, not no_kb))
+
+
+async def _generate_from_story(
+    story: str,
+    out_dir: Optional[Path],
+    feature_name: str,
+    model: Optional[str],
+    use_kb: bool,
+) -> None:
+    from oapw.generators.from_user_story import UserStoryGenerator
+    gen = UserStoryGenerator(model=model, use_kb=use_kb)
+    console.print("[bold]Generating test from user story…[/]")
+    result = await gen.generate(story, feature_name=feature_name, out_dir=out_dir)
+    if not result.ok:
+        console.print(f"[red]Error:[/] {result.error}")
+        raise typer.Exit(1)
+    if result.written:
+        console.print(f"[green]✓[/] Written: {result.path}")
+    else:
+        console.print(result.test.code)
+
+
+@generate_app.command("smoke")
+def generate_smoke(
+    url: str = typer.Argument(..., help="Base URL to crawl, e.g. http://localhost:3000"),
+    out: Optional[Path] = typer.Option(None, "--out", "-o", help="Output directory"),
+    max_pages: int = typer.Option(10, "--max-pages", help="Maximum pages to crawl"),
+    model: Optional[str] = typer.Option(None, "--model", "-m", help="Override Ollama model"),
+) -> None:
+    """Crawl a live URL and generate smoke tests for discovered pages."""
+    asyncio.run(_generate_smoke(url, out, max_pages, model))
+
+
+async def _generate_smoke(
+    url: str,
+    out_dir: Optional[Path],
+    max_pages: int,
+    model: Optional[str],
+) -> None:
+    from oapw.generators.crawler import SmokeTestCrawler
+    crawler = SmokeTestCrawler(model=model)
+    console.print(f"[bold]Crawling[/] {url} (max {max_pages} pages)…")
+    results = await crawler.crawl_and_generate(url, max_pages=max_pages, out_dir=out_dir)
+    for r in results:
+        if r.written:
+            console.print(f"[green]✓[/] {r.path}")
+        elif r.error:
+            console.print(f"[red]✗[/] {r.test.test_name}: {r.error}")
+        else:
+            console.print(f"\n[bold]{r.test.test_name}[/]")
+            console.print(r.test.code)
 
 
 # ── version ───────────────────────────────────────────────────────────────────
