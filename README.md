@@ -597,11 +597,12 @@ poetry run mypy src/
 
 | Document | Description |
 |---|---|
+| **[docs/setup.md](docs/setup.md)** | **← Start here: local machine setup + Knowledge Base walkthrough** |
 | [docs/architecture.md](docs/architecture.md) | Full system design, data flows, design decisions |
 | [docs/configuration.md](docs/configuration.md) | All `OAPW_*` environment variables and defaults |
 | [docs/cli-reference.md](docs/cli-reference.md) | Every CLI command with options and examples |
 | [docs/self-healing.md](docs/self-healing.md) | How self-healing locators work, tuning, debugging |
-| [docs/knowledge-base.md](docs/knowledge-base.md) | Setting up Jira/Confluence ingestion and RAG retrieval |
+| [docs/knowledge-base.md](docs/knowledge-base.md) | Knowledge base deep-dive: Jira/Confluence ingestion and RAG retrieval |
 | [docs/code-ingestion.md](docs/code-ingestion.md) | Indexing C# and TypeScript repos into the knowledge base |
 | [docs/development.md](docs/development.md) | Contributing guide, adding new agents, running tests |
 | [CHANGELOG.md](CHANGELOG.md) | Version history and change log |
