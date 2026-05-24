@@ -89,9 +89,10 @@ def is_cloud(url: str) -> bool:
 
 
 def repo_slug(url: str) -> str:
-    """Extract a short name from a Bitbucket clone URL.
+    """Extract a short name from a clone URL.
 
     https://bitbucket.org/workspace/my-repo.git → "my-repo"
+    git@bitbucket.org:workspace/my-repo.git     → "my-repo"
     """
-    m = re.search(r"/([^/]+?)(?:\.git)?$", url)
+    m = re.search(r"[/:]([^/:]+?)(?:\.git)?$", url)
     return m.group(1) if m else "repo"

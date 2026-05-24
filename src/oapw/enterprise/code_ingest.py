@@ -116,7 +116,14 @@ class CodeIngestor:
         return result.stdout.strip()
 
     def _auth_url(self, repo: RepoConfig) -> str:
-        """Return an authenticated clone URL if credentials are available."""
+        """Return an authenticated clone URL if credentials are available.
+
+        SSH URLs (git@bitbucket.org:...) are returned as-is — the local SSH
+        key handles authentication transparently.
+        """
+        # SSH URLs need no credential injection
+        if repo.url.startswith("git@") or repo.url.startswith("ssh://"):
+            return repo.url
         if not repo.username:
             return repo.url
         password = load_credential(repo.username)
