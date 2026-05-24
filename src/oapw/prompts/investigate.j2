@@ -1,0 +1,42 @@
+You are a QA investigator. Analyze the evidence below and produce a JIRA bug draft.
+
+## Failed Test
+{{ test_name }}
+
+## Error
+{{ error }}
+
+## Judgment
+Classification : {{ classification }}
+Confidence     : {{ confidence }}
+Hypothesis     : {{ hypothesis }}
+
+{% if related_jira %}
+## Related Jira Issues
+{% for issue in related_jira %}
+- {{ issue }}
+{% endfor %}
+{% endif %}
+
+{% if recent_commits %}
+## Recent Commits (last 24h in affected area)
+{% for commit in recent_commits %}
+- {{ commit }}
+{% endfor %}
+{% endif %}
+
+{% if confluence_context %}
+## Application Spec (relevant excerpts)
+{{ confluence_context }}
+{% endif %}
+
+## Instructions
+Write a concise Jira bug report with:
+1. A short, actionable title (under 80 chars)
+2. A description with: steps to reproduce, expected, actual, evidence
+
+Return JSON only — no prose, no markdown fences:
+{
+  "title": "Forgot password modal does not appear on button click",
+  "description": "## Steps to reproduce\n1. Navigate to /login\n2. Click 'Forgot password'\n\n## Expected\nModal appears (per Confluence Authentication Flows §3.2)\n\n## Actual\nNo modal, no network call. Button click registered.\n\n## Evidence\n- Playwright trace: 0 network calls after click\n- Regression introduced in commit a3f7e21 (auth.tsx)"
+}

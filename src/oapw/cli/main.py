@@ -533,6 +533,57 @@ async def _run_goal(
         raise typer.Exit(1)
 
 
+# ── oapw qa ──────────────────────────────────────────────────────────────────
+
+@app.command("qa")
+def qa_run(
+    goal: str = typer.Argument(..., help="Natural language QA goal"),
+    model: Optional[str] = typer.Option(None, "--model", "-m", help="Ollama model override"),
+    top_k: int = typer.Option(20, "--top-k", help="Max tests to select"),
+    no_investigate: bool = typer.Option(False, "--no-investigate", help="Skip investigation step"),
+    no_report: bool = typer.Option(False, "--no-report", help="Suppress console report"),
+) -> None:
+    """Run the QA Agent for a natural-language GOAL.
+
+    The agent parses your goal, selects relevant tests, executes them,
+    judges failures with LLM assistance, and optionally drafts JIRA bugs.
+
+    Example::
+
+        oapw qa "regression of the login flow on QA"
+        oapw qa "smoke test checkout on staging" --top-k 5
+    """
+    asyncio.run(
+        _qa_run(
+            goal=goal,
+            model=model,
+            top_k=top_k,
+            investigate=not no_investigate,
+            print_report=not no_report,
+        )
+    )
+
+
+async def _qa_run(
+    goal: str,
+    model: Optional[str],
+    top_k: int,
+    investigate: bool,
+    print_report: bool,
+) -> None:
+    from oapw.qa_agent.orchestrator import QaOrchestrator
+
+    orchestrator = QaOrchestrator(
+        model=model,
+        top_k=top_k,
+        investigate_bugs=investigate,
+        print_report=print_report,
+    )
+    result = await orchestrator.run(goal)
+    if result.failed > 0:
+        raise typer.Exit(1)
+
+
 # ── version ───────────────────────────────────────────────────────────────────
 
 @app.command()
