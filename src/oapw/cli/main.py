@@ -327,14 +327,25 @@ def kb_coverage() -> None:
 @auth_app.command("bitbucket")
 def auth_bitbucket(
     username: str = typer.Option(..., "--username", "-u", help="Bitbucket username"),
-    password: Optional[str] = typer.Option(None, "--password", "-p", help="App Password (prompted if omitted)"),
+    token: Optional[str] = typer.Option(None, "--token", "-t", help="API token (prompted if omitted). Create at: Bitbucket → Personal Settings → API tokens"),
 ) -> None:
-    """Store your Bitbucket App Password in the OS keyring."""
-    if not password:
-        password = typer.prompt("Bitbucket App Password", hide_input=True)
+    """Store your Bitbucket API token in the OS keyring.
+
+    Bitbucket Cloud has replaced App Passwords with API tokens (required from July 2026).
+    Create a token at: https://bitbucket.org/account/settings/api-tokens/
+    Required scope: Repositories → Read
+    """
+    if not token:
+        console.print(
+            "[dim]Create your token at:[/] "
+            "[link=https://bitbucket.org/account/settings/api-tokens/]"
+            "https://bitbucket.org/account/settings/api-tokens/[/link]"
+            "  [dim](scope: Repositories → Read)[/]"
+        )
+        token = typer.prompt("Bitbucket API token", hide_input=True)
     from oapw.enterprise.connectors.bitbucket import save_credential
-    save_credential(username, password)
-    console.print(f"[green]✓[/] Credential saved for {username}. Use --username {username} with oapw kb sync --repo.")
+    save_credential(username, token)
+    console.print(f"[green]✓[/] API token saved for {username}. Use --username {username} with oapw kb sync --repo.")
 
 
 @auth_app.command("atlassian")

@@ -1,15 +1,20 @@
 """Bitbucket credential helper — builds authenticated git clone URLs.
 
 Supports:
-  - Bitbucket Cloud  (bitbucket.org)
-  - Bitbucket Server / Data Center (self-hosted)
+  - Bitbucket Cloud  (bitbucket.org) with API tokens (preferred) or App Passwords (legacy)
+  - Bitbucket Server / Data Center (self-hosted) with username + token/password
+
+Bitbucket Cloud API tokens (replacing App Passwords from July 2026):
+  Create at: Bitbucket → Personal Settings → API tokens → Create token
+  Scope required: Repositories: Read
+  Authentication format: x-token-auth:{token}  (username is ignored for clone URLs)
 
 Credentials stored in OS keyring:
-  keyring.get_password("oapw:bitbucket", username)  → app password / access token
+  keyring.get_password("oapw:bitbucket", username)  → API token or App Password
 
 Usage:
-  oapw auth bitbucket --username myuser
-  oapw kb sync --repo https://bitbucket.org/workspace/repo
+  oapw auth bitbucket --username ajoshi
+  oapw kb sync --repo https://bitbucket.org/workspace/repo --username ajoshi
 """
 
 from __future__ import annotations
@@ -21,18 +26,18 @@ from dataclasses import dataclass
 @dataclass
 class BitbucketCred:
     username: str
-    password: str  # Bitbucket App Password or access token
+    token: str       # Bitbucket API token (preferred) or legacy App Password
     is_cloud: bool
 
 
-def save_credential(username: str, password: str) -> None:
-    """Store a Bitbucket App Password in the OS keyring."""
+def save_credential(username: str, token: str) -> None:
+    """Store a Bitbucket API token (or legacy App Password) in the OS keyring."""
     import keyring
-    keyring.set_password("oapw:bitbucket", username, password)
+    keyring.set_password("oapw:bitbucket", username, token)
 
 
 def load_credential(username: str) -> str | None:
-    """Load a Bitbucket App Password from the OS keyring."""
+    """Load a Bitbucket API token (or legacy App Password) from the OS keyring."""
     try:
         import keyring
         return keyring.get_password("oapw:bitbucket", username)
@@ -40,21 +45,42 @@ def load_credential(username: str) -> str | None:
         return None
 
 
-def build_auth_url(clone_url: str, username: str, password: str) -> str:
+def build_auth_url(clone_url: str, username: str, token: str) -> str:
     """Inject credentials into an HTTPS clone URL.
 
-    https://bitbucket.org/ws/repo.git
-        → https://user:pass@bitbucket.org/ws/repo.git
+    Bitbucket Cloud API tokens use ``x-token-auth:{token}`` as the credential
+    pair — the actual username is not used in the URL.
 
-    https://selfhosted.company.com/scm/proj/repo.git
-        → https://user:pass@selfhosted.company.com/scm/proj/repo.git
+    Bitbucket Server / Data Center still uses ``{username}:{token}``.
+
+    Examples::
+
+        # Cloud (API token)
+        https://bitbucket.org/ws/repo.git
+            → https://x-token-auth:{token}@bitbucket.org/ws/repo.git
+
+        # Server / DC
+        https://selfhosted.company.com/scm/proj/repo.git
+            → https://user:{token}@selfhosted.company.com/scm/proj/repo.git
     """
     import urllib.parse
     parsed = urllib.parse.urlparse(clone_url)
-    # Encode special chars in username/password
-    auth = f"{urllib.parse.quote(username, safe='')}:{urllib.parse.quote(password, safe='')}"
-    authed = parsed._replace(netloc=f"{auth}@{parsed.hostname}"
-                             + (f":{parsed.port}" if parsed.port else ""))
+
+    if is_cloud(clone_url):
+        # Bitbucket Cloud API token format
+        http_user = "x-token-auth"
+        http_pass = token
+    else:
+        # Bitbucket Server / DC — still username:token
+        http_user = username
+        http_pass = token
+
+    auth = (
+        f"{urllib.parse.quote(http_user, safe='')}:"
+        f"{urllib.parse.quote(http_pass, safe='')}"
+    )
+    port_part = f":{parsed.port}" if parsed.port else ""
+    authed = parsed._replace(netloc=f"{auth}@{parsed.hostname}{port_part}")
     return urllib.parse.urlunparse(authed)
 
 
