@@ -47,6 +47,10 @@ class OapwConfig(BaseSettings):
     # ── Hardware profile ──────────────────────────────────────────────────────
     ram_gb: int = Field(default=8, description="Available RAM (GB) — drives model selection")
 
+    # ── Atlassian ─────────────────────────────────────────────────────────────
+    atlassian_url: str = Field(default="", description="Atlassian Cloud base URL (e.g. https://company.atlassian.net)")
+    atlassian_email: str = Field(default="", description="Atlassian account email for API auth")
+
     @property
     def cache_dir(self) -> Path:
         return self.data_dir / "cache"
@@ -54,6 +58,10 @@ class OapwConfig(BaseSettings):
     @property
     def traces_dir(self) -> Path:
         return self.data_dir / "traces"
+
+    @property
+    def traceability_db(self) -> Path:
+        return self.data_dir / "traceability.db"
 
     def ensure_dirs(self) -> None:
         self.cache_dir.mkdir(parents=True, exist_ok=True)

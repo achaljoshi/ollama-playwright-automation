@@ -82,6 +82,24 @@ class CacheManager:
         cfg = get_config()
         self.set("plan", key, value, ttl=cfg.cache_l2_ttl_plan)
 
+    def get_embedding(self, key: str) -> Any | None:
+        return self.get("embedding", key)
+
+    def set_embedding(self, key: str, value: Any) -> None:
+        self.set("embedding", key, value, ttl=None)  # embeddings never expire
+
+    def get_jira(self, key: str) -> Any | None:
+        return self.get("jira", key)
+
+    def set_jira(self, key: str, value: Any) -> None:
+        self.set("jira", key, value, ttl=24 * 3600)  # 1 day
+
+    def get_confluence(self, key: str) -> Any | None:
+        return self.get("confluence", key)
+
+    def set_confluence(self, key: str, value: Any) -> None:
+        self.set("confluence", key, value, ttl=24 * 3600)  # 1 day
+
     # ── Maintenance ───────────────────────────────────────────────────────────
 
     def prune(self) -> int:

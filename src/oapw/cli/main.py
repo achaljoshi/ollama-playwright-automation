@@ -25,9 +25,13 @@ app = typer.Typer(
 )
 console = Console()
 
-# ── Sub-app groups (populated by other modules as framework grows) ────────────
+# ── Sub-app groups ────────────────────────────────────────────────────────────
 cache_app = typer.Typer(name="cache", help="Cache management commands", no_args_is_help=True)
+kb_app = typer.Typer(name="kb", help="Knowledge base commands (Jira + Confluence)", no_args_is_help=True)
+auth_app = typer.Typer(name="auth", help="Credential management", no_args_is_help=True)
 app.add_typer(cache_app)
+app.add_typer(kb_app)
+app.add_typer(auth_app)
 
 
 # ── doctor ────────────────────────────────────────────────────────────────────
@@ -178,6 +182,115 @@ def _print_cache_stats(stats: dict) -> None:
     table.add_row("L2 Disk (SQLite)", str(l2["hits"]), str(l2["misses"]),
                   f"{l2['rows']} rows")
     console.print(table)
+
+
+# ── kb sub-commands ───────────────────────────────────────────────────────────
+
+@kb_app.command("sync")
+def kb_sync(
+    jira: Optional[str] = typer.Option(None, "--jira", help="JQL query, e.g. 'project = PROJ AND issuetype = Story'"),
+    confluence: Optional[str] = typer.Option(None, "--confluence", help="CQL query, e.g. 'label = qa AND space = ENG'"),
+    component: Optional[str] = typer.Option(None, "--component", help="Jira component name for Confluence weighting"),
+    max_results: int = typer.Option(50, "--max", help="Max items per source"),
+) -> None:
+    """Sync Jira tickets and/or Confluence pages into the knowledge base."""
+    asyncio.run(_kb_sync(jira, confluence, component, max_results))
+
+
+async def _kb_sync(
+    jira_jql: str | None,
+    conf_cql: str | None,
+    component: str | None,
+    max_results: int,
+) -> None:
+    if not jira_jql and not conf_cql:
+        console.print("[yellow]Provide at least --jira or --confluence.[/]")
+        raise typer.Exit(1)
+
+    if jira_jql:
+        try:
+            from oapw.enterprise.jira_ingest import JiraIngestor
+            console.print(f"[bold]Ingesting Jira:[/] {jira_jql}")
+            result = await JiraIngestor().ingest_query(jira_jql, max_results=max_results)
+            console.print(
+                f"  [green]✓[/] {result.added}/{result.total} tickets ingested"
+                + (f" ({result.errors} errors)" if result.errors else "")
+            )
+        except Exception as exc:
+            console.print(f"[red]Jira ingest failed:[/] {exc}")
+
+    if conf_cql:
+        try:
+            from oapw.enterprise.confluence_ingest import ConfluenceIngestor
+            console.print(f"[bold]Ingesting Confluence:[/] {conf_cql}")
+            result = await ConfluenceIngestor().ingest_query(
+                conf_cql, max_results=max_results, component=component
+            )
+            console.print(
+                f"  [green]✓[/] {result.added}/{result.total} pages ingested"
+                + (f" ({result.errors} errors)" if result.errors else "")
+            )
+        except Exception as exc:
+            console.print(f"[red]Confluence ingest failed:[/] {exc}")
+
+
+@kb_app.command("stats")
+def kb_stats() -> None:
+    """Show knowledge base document counts."""
+    try:
+        from oapw.knowledge.vector_store import get_knowledge_store
+        store = get_knowledge_store()
+        n = store.count()
+        console.print(f"Knowledge base: [bold]{n}[/] documents indexed")
+    except RuntimeError as exc:
+        console.print(f"[yellow]{exc}[/]")
+
+
+@kb_app.command("clear")
+def kb_clear(
+    confirm: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+) -> None:
+    """Remove all documents from the knowledge base."""
+    if not confirm:
+        typer.confirm("This will delete all indexed Jira/Confluence documents. Continue?", abort=True)
+    try:
+        from oapw.knowledge.vector_store import get_knowledge_store
+        get_knowledge_store().clear()
+        console.print("[green]Knowledge base cleared.[/]")
+    except RuntimeError as exc:
+        console.print(f"[yellow]{exc}[/]")
+
+
+@kb_app.command("coverage")
+def kb_coverage() -> None:
+    """Show which Jira tickets have traced automated tests."""
+    from oapw.core.config import get_config
+    from oapw.enterprise.traceability import TraceabilityStore
+    store = TraceabilityStore(db_path=get_config().traceability_db)
+    summary = store.coverage_summary()
+    table = Table(title="Test Coverage Summary", box=box.ROUNDED)
+    table.add_column("Metric", style="bold")
+    table.add_column("Value", justify="right")
+    table.add_row("Tests with traceability", str(summary["total_tests_traced"]))
+    table.add_row("Jira tickets covered", str(summary["jira_tickets_covered"]))
+    if summary["jira_keys"]:
+        table.add_row("Ticket keys", ", ".join(summary["jira_keys"][:10]))
+    console.print(table)
+
+
+# ── auth sub-commands ─────────────────────────────────────────────────────────
+
+@auth_app.command("atlassian")
+def auth_atlassian(
+    email: str = typer.Option(..., "--email", "-e", help="Atlassian account email"),
+    token: Optional[str] = typer.Option(None, "--token", "-t", help="API token (prompted if omitted)"),
+) -> None:
+    """Store your Atlassian API token in the OS keyring."""
+    if not token:
+        token = typer.prompt("Atlassian API token", hide_input=True)
+    from oapw.enterprise.atlassian_client import AtlassianClient
+    AtlassianClient.save_token(email, token)
+    console.print(f"[green]✓[/] Token saved for {email}. Set OAPW_ATLASSIAN_EMAIL={email} in your env.")
 
 
 # ── version ───────────────────────────────────────────────────────────────────
