@@ -203,6 +203,17 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+# oapw runtime data
+.oapw/
+
+# Playwright traces & artifacts
+test-results/
+playwright-report/
+
+# Allure reports
+allure-results/
+allure-report/
+
 # Ruff stuff:
 .ruff_cache/
 

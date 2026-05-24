@@ -1,0 +1,26 @@
+name: Framework Self-Eval
+
+on:
+  push:
+    paths:
+      - "prompts/**"
+      - "src/oapw/core/ollama_client.py"
+      - "src/oapw/agents/**"
+
+jobs:
+  self-eval:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+      - run: poetry install --no-interaction
+      - run: poetry run playwright install chromium --with-deps
+      - name: Run eval suite
+        run: poetry run pytest tests/eval/ -v --tb=short
+        env:
+          OAPW_OLLAMA_BASE_URL: ${{ secrets.OLLAMA_BASE_URL || 'http://localhost:11434' }}
