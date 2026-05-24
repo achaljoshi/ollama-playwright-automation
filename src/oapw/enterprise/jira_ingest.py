@@ -71,17 +71,32 @@ class JiraIngestor:
             logger.warning("Failed to ingest %s: %s", issue_key, exc)
             return False
 
-    async def ingest_query(self, jql: str, max_results: int = 50) -> IngestResult:
-        """Fetch all tickets matching a JQL query and ingest them."""
+    async def ingest_query(
+        self,
+        jql: str,
+        max_results: int = 0,
+        progress_cb=None,
+    ) -> IngestResult:
+        """Fetch all tickets matching a JQL query and ingest them.
+
+        Streams results page-by-page so large result sets (thousands of tickets)
+        are processed incrementally without holding everything in memory.
+
+        Args:
+            jql:         JQL query string.
+            max_results: Cap on total tickets to ingest. 0 (default) = no cap.
+            progress_cb: Optional callable(ingested, total_so_far) for progress
+                         reporting (called after each page is upserted).
+        """
         result = IngestResult()
         try:
-            tickets = await self._client.search_jira(jql, max_results=max_results)
-            result.total = len(tickets)
-            docs = [self._ticket_to_doc(t) for t in tickets]
-            if docs:
+            async for page in self._client._iter_jira_pages(jql, page_size=100):
+                if not page:
+                    continue
+                docs = [self._ticket_to_doc(self._client._parse_jira_issue(issue)) for issue in page]
                 try:
                     await self._store.add_batch(docs)
-                    result.added = len(docs)
+                    result.added += len(docs)
                 except Exception as batch_exc:
                     logger.warning("Batch ingest failed, falling back: %s", batch_exc)
                     for doc in docs:
@@ -90,6 +105,11 @@ class JiraIngestor:
                             result.added += 1
                         except Exception:
                             result.errors += 1
+                result.total += len(page)
+                if progress_cb:
+                    progress_cb(result.added, result.total)
+                if max_results > 0 and result.total >= max_results:
+                    break
         except Exception as exc:
             logger.error("JQL search failed: %s", exc)
             result.errors += 1

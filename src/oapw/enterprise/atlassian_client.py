@@ -174,55 +174,118 @@ class AtlassianClient:
     async def search_jira(self, jql: str, max_results: int = 50) -> list[JiraTicket]:
         """Search Jira using JQL.
 
-        Tries POST /rest/api/3/search/jql first (Jira Cloud 2024+),
-        falls back to POST /rest/api/3/search, then GET /rest/api/3/search.
+        Paginates automatically using cursor-based nextPageToken (Jira Cloud
+        2024+). Pass max_results=0 (or a negative value) to fetch every ticket
+        that matches the query.
+
+        Falls back to POST /rest/api/3/search, then GET /rest/api/3/search if
+        the preferred endpoint returns an error.
+        """
+        tickets: list[JiraTicket] = []
+        async for page in self._iter_jira_pages(jql, page_size=100):
+            for issue in page:
+                tickets.append(self._parse_jira_issue(issue))
+            if max_results > 0 and len(tickets) >= max_results:
+                return tickets[:max_results]
+        return tickets
+
+    async def _iter_jira_pages(self, jql: str, page_size: int = 100):
+        """Async generator that yields one page (list of raw issue dicts) at a time.
+
+        Uses cursor-based pagination via nextPageToken (Jira Cloud 2024+).
+        Falls back to offset-based pagination if the new endpoint is unavailable.
         """
         fields_list = _JIRA_FIELDS.split(",")
-        body = {"jql": jql, "maxResults": max_results, "fields": fields_list}
 
-        data: dict | None = None
-        last_error: Exception | None = None
+        # Detect which search endpoint works on first call
+        _use_new_api: bool | None = None
 
-        for endpoint, use_post, payload in [
-            ("/rest/api/3/search/jql", True, body),
-            ("/rest/api/3/search",     True, body),
-            ("/rest/api/3/search",     False, None),
-        ]:
-            try:
-                if use_post:
-                    data = await self._post(endpoint, payload)  # type: ignore[arg-type]
-                else:
-                    data = await self._get(
-                        endpoint,
-                        params={"jql": jql, "maxResults": max_results, "fields": _JIRA_FIELDS},
-                    )
-                break
-            except Exception as exc:
-                last_error = exc
-                logger.debug("Jira search via %s failed: %s", endpoint, exc)
-                continue
+        next_page_token: str | None = None
+        start_at: int = 0
 
-        if data is None:
-            raise RuntimeError(f"JQL search failed: {last_error}")
+        while True:
+            # ── Try new cursor-based endpoint ─────────────────────────────────
+            if _use_new_api is not False:
+                body: dict = {"jql": jql, "maxResults": page_size, "fields": fields_list}
+                if next_page_token:
+                    body["nextPageToken"] = next_page_token
+                try:
+                    data = await self._post("/rest/api/3/search/jql", body)
+                    _use_new_api = True
+                    issues = data.get("issues", [])
+                    yield issues
+                    if data.get("isLast", True) or not issues:
+                        return
+                    next_page_token = data.get("nextPageToken")
+                    if not next_page_token:
+                        return
+                    continue
+                except Exception as exc:
+                    if _use_new_api is None:
+                        logger.debug("New Jira search API unavailable (%s), falling back", exc)
+                        _use_new_api = False
+                    else:
+                        raise
 
-        tickets: list[JiraTicket] = []
-        for issue in data.get("issues", []):
-            fields = issue.get("fields", {})
-            desc = _adf_to_text(fields.get("description") or {})
-            tickets.append(JiraTicket(
-                id=issue["id"],
-                key=issue["key"],
-                summary=fields.get("summary", ""),
-                description=desc,
-                status=(fields.get("status") or {}).get("name", ""),
-                issue_type=(fields.get("issuetype") or {}).get("name", ""),
-                priority=(fields.get("priority") or {}).get("name", ""),
-                components=[c["name"] for c in (fields.get("components") or [])],
-                labels=fields.get("labels") or [],
-                acceptance_criteria=_extract_ac(desc),
-                url=f"{self._base_url}/browse/{issue['key']}",
-            ))
-        return tickets
+            # ── Legacy offset-based fallback ──────────────────────────────────
+            body_legacy: dict = {
+                "jql": jql,
+                "maxResults": page_size,
+                "startAt": start_at,
+                "fields": fields_list,
+            }
+            last_error: Exception | None = None
+            data = None
+            for endpoint, use_post in [
+                ("/rest/api/3/search", True),
+                ("/rest/api/3/search", False),
+            ]:
+                try:
+                    if use_post:
+                        data = await self._post(endpoint, body_legacy)
+                    else:
+                        data = await self._get(
+                            endpoint,
+                            params={
+                                "jql": jql,
+                                "maxResults": page_size,
+                                "startAt": start_at,
+                                "fields": _JIRA_FIELDS,
+                            },
+                        )
+                    break
+                except Exception as exc:
+                    last_error = exc
+                    logger.debug("Jira search via %s failed: %s", endpoint, exc)
+
+            if data is None:
+                raise RuntimeError(f"JQL search failed: {last_error}")
+
+            issues = data.get("issues", [])
+            yield issues
+            if not issues:
+                return
+            start_at += len(issues)
+            total = data.get("total", 0)
+            if total and start_at >= total:
+                return
+
+    def _parse_jira_issue(self, issue: dict) -> JiraTicket:
+        fields = issue.get("fields", {})
+        desc = _adf_to_text(fields.get("description") or {})
+        return JiraTicket(
+            id=issue["id"],
+            key=issue["key"],
+            summary=fields.get("summary", ""),
+            description=desc,
+            status=(fields.get("status") or {}).get("name", ""),
+            issue_type=(fields.get("issuetype") or {}).get("name", ""),
+            priority=(fields.get("priority") or {}).get("name", ""),
+            components=[c["name"] for c in (fields.get("components") or [])],
+            labels=fields.get("labels") or [],
+            acceptance_criteria=_extract_ac(desc),
+            url=f"{self._base_url}/browse/{issue['key']}",
+        )
 
     # ── Confluence ────────────────────────────────────────────────────────────
 

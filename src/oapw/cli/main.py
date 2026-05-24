@@ -198,7 +198,7 @@ def kb_sync(
     component: Optional[str] = typer.Option(None, "--component", help="Jira component name for Confluence weighting"),
     branch: str = typer.Option("main", "--branch", help="Git branch for --repo syncs"),
     username: Optional[str] = typer.Option(None, "--username", help="Bitbucket username (uses keyring credential)"),
-    max_results: int = typer.Option(50, "--max", help="Max items per Jira/Confluence source"),
+    max_results: int = typer.Option(0, "--max", help="Max items per Jira/Confluence source (0 = no limit, fetch all)"),
 ) -> None:
     """Sync Jira tickets, Confluence pages, and/or code repos into the knowledge base."""
     asyncio.run(_kb_sync(jira, confluence, repo or [], component, branch, username, max_results))
@@ -220,8 +220,20 @@ async def _kb_sync(
     if jira_jql:
         try:
             from oapw.enterprise.jira_ingest import JiraIngestor
-            console.print(f"[bold]Ingesting Jira:[/] {jira_jql}")
-            result = await JiraIngestor().ingest_query(jira_jql, max_results=max_results)
+            cap_note = f" (cap: {max_results})" if max_results > 0 else " (all tickets)"
+            console.print(f"[bold]Ingesting Jira:[/] {jira_jql}{cap_note}")
+
+            _last_print = [0]
+
+            def _progress(added: int, total: int) -> None:
+                # Print every 100 tickets to avoid flooding the terminal
+                if total - _last_print[0] >= 100:
+                    console.print(f"  … {added}/{total} ingested so far")
+                    _last_print[0] = total
+
+            result = await JiraIngestor().ingest_query(
+                jira_jql, max_results=max_results, progress_cb=_progress
+            )
             console.print(
                 f"  [green]✓[/] {result.added}/{result.total} tickets ingested"
                 + (f" ({result.errors} errors)" if result.errors else "")
