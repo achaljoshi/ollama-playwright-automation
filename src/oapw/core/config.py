@@ -47,6 +47,11 @@ class OapwConfig(BaseSettings):
     # ── Hardware profile ──────────────────────────────────────────────────────
     ram_gb: int = Field(default=8, description="Available RAM (GB) — drives model selection")
 
+    # ── Agent system ──────────────────────────────────────────────────────────
+    agent_max_steps: int = Field(default=50, description="Hard cap on total steps per AgentRunner.run() call")
+    agent_max_step_retries: int = Field(default=2, description="Max retries for a failed step before consulting the hook")
+    agent_loop_window: int = Field(default=6, description="Sliding window size for cycle detection in LoopGuard")
+
     # ── Application under test ────────────────────────────────────────────────
     app_base_url: str = Field(default="http://localhost:3000", description="Base URL of the application under test (used by ApiClient)")
     app_api_base_url: str = Field(default="", description="API base URL if different from app_base_url (e.g. http://localhost:8080/api)")

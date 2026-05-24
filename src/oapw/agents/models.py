@@ -76,3 +76,36 @@ class StepResult(BaseModel):
     extracted_value: Any = None
     locator_used: str | None = None
     duration_ms: float = 0.0
+    attempt: int = Field(default=1, description="Attempt number (1 = first try)")
+
+
+# ── Run-level models ──────────────────────────────────────────────────────────
+
+class RunStatus(str, Enum):
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    ABORTED = "aborted"
+    LOOP_DETECTED = "loop_detected"
+    BUDGET_EXCEEDED = "budget_exceeded"
+
+
+class RunResult(BaseModel):
+    """Aggregated result for a full AgentRunner.run() call."""
+
+    goal: str
+    status: RunStatus
+    plan: Plan
+    steps_executed: list[StepResult] = Field(default_factory=list)
+    error: str | None = None
+    duration_ms: float = 0.0
+    loop_detected: bool = False
+    human_override: str | None = None
+
+    @property
+    def ok(self) -> bool:
+        return self.status == RunStatus.COMPLETED
+
+    @property
+    def failed_steps(self) -> list[StepResult]:
+        return [r for r in self.steps_executed if not r.success]

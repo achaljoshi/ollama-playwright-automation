@@ -30,10 +30,12 @@ cache_app = typer.Typer(name="cache", help="Cache management commands", no_args_
 kb_app = typer.Typer(name="kb", help="Knowledge base commands (Jira + Confluence)", no_args_is_help=True)
 auth_app = typer.Typer(name="auth", help="Credential management", no_args_is_help=True)
 generate_app = typer.Typer(name="generate", help="Test generation commands", no_args_is_help=True)
+run_app = typer.Typer(name="run", help="Run the AI agent against a live browser", no_args_is_help=True)
 app.add_typer(cache_app)
 app.add_typer(kb_app)
 app.add_typer(auth_app)
 app.add_typer(generate_app)
+app.add_typer(run_app)
 
 
 # ── doctor ────────────────────────────────────────────────────────────────────
@@ -445,6 +447,90 @@ async def _generate_smoke(
         else:
             console.print(f"\n[bold]{r.test.test_name}[/]")
             console.print(r.test.code)
+
+
+# ── oapw run ─────────────────────────────────────────────────────────────────
+
+@run_app.command("goal")
+def run_goal(
+    goal: str = typer.Argument(..., help="Natural language goal to achieve in the browser"),
+    url: str = typer.Option(..., "--url", "-u", help="Starting URL to navigate to"),
+    model: Optional[str] = typer.Option(None, "--model", "-m", help="Ollama model override"),
+    max_steps: int = typer.Option(50, "--max-steps", help="Hard cap on total steps"),
+    max_retries: int = typer.Option(2, "--max-retries", help="Retries per failed step"),
+    interactive: bool = typer.Option(False, "--interactive", "-i", help="Enable human-in-loop console prompts"),
+    headless: bool = typer.Option(True, "--headless/--no-headless", help="Run browser headlessly"),
+) -> None:
+    """Run an AI agent to achieve a natural-language GOAL in a live browser.
+
+    Example::
+
+        oapw run goal "Add the first product to cart and verify the cart badge shows 1" \\
+            --url http://localhost:3000/shop
+    """
+    asyncio.run(
+        _run_goal(
+            goal=goal,
+            url=url,
+            model=model,
+            max_steps=max_steps,
+            max_retries=max_retries,
+            interactive=interactive,
+            headless=headless,
+        )
+    )
+
+
+async def _run_goal(
+    goal: str,
+    url: str,
+    model: Optional[str],
+    max_steps: int,
+    max_retries: int,
+    interactive: bool,
+    headless: bool,
+) -> None:
+    from oapw.agents.hooks import ConsoleHook, HookEvent, HookRegistry
+    from oapw.agents.runner import AgentRunner
+    from oapw.core.browser import managed_browser
+
+    hooks = HookRegistry()
+    if interactive:
+        hook = ConsoleHook()
+        hooks.register(HookEvent.STEP_FAILED, hook)
+        hooks.register(HookEvent.LOOP_DETECTED, hook)
+        hooks.register(HookEvent.PLAN_READY, hook)
+
+    runner = AgentRunner(
+        model=model,
+        hooks=hooks,
+        max_steps=max_steps,
+        max_retries=max_retries,
+    )
+
+    console.print(f"[bold]Goal:[/] {goal}")
+    console.print(f"[bold]URL :[/] {url}\n")
+
+    async with managed_browser(headless=headless) as mgr:
+        async with mgr.new_page() as page:
+            await page.goto(url)
+            result = await runner.run(goal, page)
+
+    # Report
+    status_color = "green" if result.ok else "red"
+    console.print(
+        f"\n[{status_color}][bold]Status:[/bold] {result.status.value}[/]"
+        f"  ({result.duration_ms:.0f} ms)"
+    )
+    console.print(f"Steps executed: {len(result.steps_executed)}")
+    if result.failed_steps:
+        console.print(f"[red]Failed steps:[/] {len(result.failed_steps)}")
+        for s in result.failed_steps:
+            console.print(f"  • {s.step.description}: {s.error}")
+    if result.error:
+        console.print(f"[red]Error:[/] {result.error}")
+    if not result.ok:
+        raise typer.Exit(1)
 
 
 # ── version ───────────────────────────────────────────────────────────────────
