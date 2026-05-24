@@ -446,6 +446,33 @@ With `--interactive`, the agent pauses on failures and asks you: Continue / Abor
 
 ---
 
+## oapw qa
+
+Run the autonomous QA Agent for a natural-language goal.
+
+```
+oapw qa GOAL [OPTIONS]
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `GOAL` | required | Natural language QA goal |
+| `--model` / `-m` | config | Ollama model override |
+| `--top-k` | `20` | Max tests to select |
+| `--no-investigate` | `false` | Skip investigation step (faster) |
+| `--no-report` | `false` | Suppress console report |
+
+**Examples:**
+```bash
+oapw qa "regression of the login flow on QA"
+oapw qa "smoke test checkout on staging" --top-k 5
+oapw qa "run AUTH-42 acceptance tests" --no-investigate
+```
+
+The agent: parses the goal → selects tests → executes them → judges failures with LLM+Confluence context → optionally investigates real bugs and drafts JIRA tickets → prints a Rich-formatted report.
+
+---
+
 ## Shell Completion
 
 Enable tab completion for your shell:

@@ -136,6 +136,17 @@ Expected output from `oapw doctor`:
 - **LLM replan**: on step failure, optionally asks the LLM to generate revised remaining steps
 - **`oapw run goal`**: CLI command to run the AI agent against a live browser
 
+### Phase 8 — QA Agent Mode
+- **QaOrchestrator**: autonomous agent pipeline — parse goal → select tests → execute → judge → investigate → report
+- **GoalParser**: converts "run login regression on QA" into structured intent (scope, feature areas, environment)
+- **TestSelector**: ranks tests by feature relevance; filters by scope tier (smoke/regression/critical/full)
+- **JudgmentEngine**: LLM classifies failures as real_bug / flaky / env_issue / data_issue / unclear with confidence score
+- **Investigator**: digs into failures — Jira history, git log, correlated failing tests; drafts a JIRA bug report
+- **QaMemory**: persistent SQLite-backed run history and known-issue tracking with flaky-test detection
+- **SmartExecutor**: runs pytest files or natural-language goals via AgentRunner
+- **ConsoleReporter**: Rich-formatted run summary with per-test judgment and investigation details
+- **`oapw qa`**: single CLI command — `oapw qa "regression of login on QA"`
+
 ---
 
 ## Installation

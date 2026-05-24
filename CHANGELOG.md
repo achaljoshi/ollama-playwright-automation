@@ -17,6 +17,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [0.1.0] — 2026-05-24
 
+## [Phase 8] — QA Agent Mode
+### Added
+- `qa_agent/models.py`: `QaGoal`, `TestScope`, `TestCandidate`, `Judgment`, `Investigation`, `KnownIssue`, `TestRunResult`, `QaRunResult` (with `pass_rate`, `real_bugs`, `failed_steps` helpers)
+- `qa_agent/goal_parser.py`: `GoalParser` — LLM-backed NL goal → `QaGoal` (scope, feature_areas, environment, Jira refs); result cached
+- `qa_agent/memory.py`: `QaMemory` — SQLite-backed persistent run history + known-issue tracking with flaky test detection
+- `qa_agent/test_selector.py`: `TestSelector` — merges memory + KB sources; filters by scope tier; ranks by composite relevance score
+- `qa_agent/judgment.py`: `JudgmentEngine` — LLM classifies failures as real_bug / flaky / env_issue / data_issue / unclear; `needs_escalation` when confidence < 0.6
+- `qa_agent/investigator.py`: `Investigator` — Jira history lookup, recent git log, correlated failures, LLM-drafted JIRA bug title + description
+- `qa_agent/smart_executor.py`: `SmartExecutor` — file-based (pytest JSON report) and goal-based (AgentRunner) execution
+- `qa_agent/reporter/console.py`: `ConsoleReporter` — Rich table + failure detail + judgment output (PLAN.md §7.5 format)
+- `qa_agent/orchestrator.py`: `QaOrchestrator` — top-level pipeline: parse → select → execute → judge → investigate → report
+- `prompts/goal_parse.j2`, `prompts/judgment.j2`, `prompts/investigate.j2`: LLM prompt templates
+- `cli/main.py`: `oapw qa GOAL` command with `--top-k`, `--no-investigate`, `--no-report`
+### Tests added
+- `tests/unit/test_qa_agent.py`: 49 unit tests covering all QA Agent components
+
+---
+
 ## [Phase 7] — Agent System
 ### Added
 - `agents/loop_guard.py`: `LoopGuard` with configurable budget cap and sliding-window cycle detection (`LoopViolation` exception)
